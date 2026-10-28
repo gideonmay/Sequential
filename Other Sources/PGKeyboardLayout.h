@@ -60,6 +60,7 @@ enum {
 	PGKeySpace = 49,
 	PGKeyReturn = 36,
 	PGKeyEscape = 53,
+	PGKeyForwardDelete = 117,	//	2026/10/28 added: the Delete key above the arrow keys
 	PGKeyEquals = 24,
 	PGKeyMinus = 27,
 

@@ -198,6 +198,7 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 - (void)_runPageTransitionFromSnapshot:(NSBitmapImageRep *)before;	//	2026/10/28 added
 - (void)_endPageTransition;	//	2026/10/28 added
 - (void)_updateAmbientBackground;	//	2026/10/28 added
+- (void)_moveActiveNodeToTrash;	//	2026/10/28 added
 
 - (void)_setClipViewBackground;
 - (void)_setImageView:(PGImageView *)aView;
@@ -1582,6 +1583,21 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	}
 	[CATransaction commit];
 }
+- (void)_moveActiveNodeToTrash	//	2026/10/28 added
+{
+	//	only files on disk (not, eg, images in archives); removing the node shows
+	//	the next image (see -documentWillRemoveNodes:) and a running timer continues
+	PGNode *const node = self.activeNode;
+	PGResourceIdentifier *const ident = node.identifier;
+	NSURL *const URL = ident.isFileIdentifier && node.isViewable ? ident.URL : nil;
+	if(!URL) return NSBeep();
+	[[NSWorkspace sharedWorkspace] recycleURLs:@[URL] completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if(error || !newURLs[URL]) return NSBeep();
+			[node removeFromDocument];
+		});
+	}];
+}
 - (void)_updateAmbientBackground	//	2026/10/28 added
 {
 	//	not while colors are inverted: the image is inverted by a layer filter
@@ -2608,6 +2624,9 @@ proposedFrame.size.width, proposedFrame.size.height); */
 	unsigned short const keyCode = anEvent.keyCode;
 	if(!modifiers) switch(keyCode) {
 		case PGKeyEscape: return [[PGDocumentController sharedDocumentController] performEscapeKeyAction];
+		case PGKeyForwardDelete:	//	2026/10/28 added; repeats are ignored so that
+			if(!anEvent.ARepeat) [self _moveActiveNodeToTrash];	//	holding the key can't trash many images
+			return YES;
 	}
 	if(!modifiers || !(~(NSEventModifierFlagCommand | NSEventModifierFlagShift) & modifiers)) switch(keyCode) {
 		case PGKeyPadPlus:
