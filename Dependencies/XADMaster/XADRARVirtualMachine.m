@@ -396,9 +396,13 @@ value:(uint32_t *)valueptr byteMode:(BOOL)bytemode isRelativeJump:(BOOL)isrel cu
 	if(newgloballength>RARProgramUserGlobalSize) newgloballength=RARProgramUserGlobalSize;
 	if(newgloballength>0)
 	{
+		// 2026/10/28 Sequential: was passed [globaldata mutableBytes] (a raw pointer, which
+		// -readMemoryAtAddress:length:toMutableData: then sent -mutableBytes to) without
+		// resizing globaldata first, which overflowed it
+		[globaldata setLength:RARProgramSystemGlobalSize+newgloballength];
 		[vm readMemoryAtAddress:RARProgramSystemGlobalAddress
 		length:RARProgramSystemGlobalSize+newgloballength
-		toMutableData:[globaldata mutableBytes]];
+		toMutableData:globaldata];
 	}
 	else [globaldata setLength:0];
 

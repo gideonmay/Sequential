@@ -574,7 +574,7 @@
 			[stack removeAllObjects];
 		}
 
-		if(num>numcodes||num<0||num>1024) [XADException raiseIllegalDataException];
+		if(num>numcodes||num<0||num>=1024) [XADException raiseIllegalDataException]; // 2026/10/28 Sequential: was num>1024; the arrays have 1024 elements
 		if(num==numcodes)
 		{
 			isnew=YES;
@@ -595,6 +595,8 @@
 	uint32_t blocklength;
 	if(flags&0x20) blocklength=oldfilterlength[num]=CSInputNextRARVMNumber(filterinput);
 	else blocklength=oldfilterlength[num];
+	// 2026/10/28 Sequential: the filtered block is copied into the VM's fixed-size memory
+	if(blocklength>RARProgramMemorySize) [XADException raiseIllegalDataException];
 
 	uint32_t registers[8]={
 		[3]=RARProgramSystemGlobalAddress,[4]=blocklength,

@@ -105,7 +105,7 @@ startPosition:(off_t)startpos length:(int)length
 	int numchannels=[invocation initialRegisterState:0];
 	uint8_t *memory=[vm memory];
 
-	if(length>RARProgramWorkSize/2) return;
+	if(length<0||length>RARProgramWorkSize/2) return; // 2026/10/28 Sequential: length<0 check added
 
 	filteredblockaddress=length;
 	filteredblocklength=length;
@@ -128,7 +128,7 @@ startPosition:(off_t)startpos length:(int)length
 	int numchannels=[invocation initialRegisterState:0];
 	uint8_t *memory=[vm memory];
 
-	if(length>RARProgramWorkSize/2) return;
+	if(length<0||length>RARProgramWorkSize/2) return; // 2026/10/28 Sequential: length<0 check added
 
 	filteredblockaddress=length;
 	filteredblocklength=length;
