@@ -61,9 +61,9 @@ Pack_ByteSize_FolderImageCounts(uint64_t byteSize, NSUInteger folders, NSUIntege
 	static_assert(sizeof(byteSize) >= sizeof(folders), "");
 	static_assert(sizeof(byteSize) >= sizeof(images), "");
 	enum : NSUInteger { BYTE_SIZE_BIT_COUNT = 36, FOLDER_BIT_COUNT = 10, IMAGE_BIT_COUNT = 18 };
-	NSCAssert(byteSize < (1ull << BYTE_SIZE_BIT_COUNT), @"byteSize");	//	36 bits: 64G = 68,719,476,736
-	NSCAssert(folders  < (1ull << FOLDER_BIT_COUNT), @"folders");		//	10 bits: 1k = 1024
-	NSCAssert(images   < (1ull << IMAGE_BIT_COUNT), @"images");			//	18 bits: 256k = 262144
+	//	2026/10/28 the assertions which were here crashed the app for folders
+	//	with 1024+ subfolders/archives; values that don't fit return 0 instead
+	//	36 bits: 64G = 68,719,476,736; 10 bits: 1k = 1024; 18 bits: 256k = 262144
 	if(byteSize >= (1ull << BYTE_SIZE_BIT_COUNT) ||
 	   folders  >= (1ull << FOLDER_BIT_COUNT) ||
 	   images   >= (1ull << IMAGE_BIT_COUNT))

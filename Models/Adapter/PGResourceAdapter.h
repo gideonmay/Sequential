@@ -66,7 +66,13 @@ typedef NS_ENUM(NSInteger, PGRecursionPolicy) {
 - (instancetype)initWithNode:(PGNode *)node dataProvider:(PGDataProvider *)dataProvider NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
+#if __has_feature(objc_arc)
+//	2026/10/28 weak: was strong under ARC, a retain cycle with -[PGNode resourceAdapter]
+//	which leaked every document (and kept its archive files open) after it was closed
+@property (readonly, weak) PGNode *node;
+#else
 @property(readonly) PGNode *node;
+#endif
 #if __has_feature(objc_arc)
 @property(readonly) __kindof PGDataProvider *dataProvider;
 #else

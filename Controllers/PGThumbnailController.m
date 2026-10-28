@@ -216,9 +216,8 @@ NSString *const PGThumbnailControllerContentInsetDidChangeNotification = @"PGThu
 		if((aNotif.userInfo)[@"PGDocument"] != _document)
 			return;
 
-		PGNode *const node = (aNotif.userInfo)[@"PGNode"];
-		NSAssert(node, @"node");
-		_browser.selection = node ? [NSSet setWithObject:node] : nil;
+		PGNode *const node = (aNotif.userInfo)[@"PGNode"];	//	2026/10/28 nil when there's no image left
+		_browser.selection = node ? [NSSet setWithObject:node] : [NSSet set];
 	} else
 		_browser.selection = self.displayController.selectedNodes;
 }

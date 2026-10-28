@@ -338,24 +338,17 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	if(self.activeDocument.online) {
 		if([[NSWorkspace sharedWorkspace] openURL:[self.activeDocument.rootIdentifier URLByFollowingAliases:NO]]) return;
 	} else {
+		//	2026/10/28 the Path Finder branch was removed: it built AppleScript source
+		//	from the file path, so a file name containing quotes could inject script
 		NSString *const path = [self.activeNode.identifier URLByFollowingAliases:NO].path;
-		if([PGDocumentController sharedDocumentController].pathFinderRunning) {
-#if __has_feature(objc_arc)
-			if([[[NSAppleScript alloc] initWithSource:[NSString stringWithFormat:@"tell application \"Path Finder\"\nactivate\nreveal \"%@\"\nend tell", path]] executeAndReturnError:NULL])
+	//	if([[NSWorkspace sharedWorkspace] selectFile:path inFileViewerRootedAtPath:nil]) return;
+		NSString*	rootPath = @(self.activeDocument.rootIdentifier.URL.fileSystemRepresentation);
+		if(!path) {
+			//	2023/09/28 revealing an image in an archive will select the archive file
+			if([[NSWorkspace sharedWorkspace] selectFile:rootPath inFileViewerRootedAtPath:[NSString string]])
 				return;
-#else
-			if([[[[NSAppleScript alloc] initWithSource:[NSString stringWithFormat:@"tell application \"Path Finder\"\nactivate\nreveal \"%@\"\nend tell", path]] autorelease] executeAndReturnError:NULL]) return;
-#endif
-		} else {
-		//	if([[NSWorkspace sharedWorkspace] selectFile:path inFileViewerRootedAtPath:nil]) return;
-			NSString*	rootPath = @(self.activeDocument.rootIdentifier.URL.fileSystemRepresentation);
-			if(!path) {
-				//	2023/09/28 revealing an image in an archive will select the archive file
-				if([[NSWorkspace sharedWorkspace] selectFile:rootPath inFileViewerRootedAtPath:[NSString string]])
-					return;
-			} else if([[NSWorkspace sharedWorkspace] selectFile:path inFileViewerRootedAtPath:rootPath])
-				return;
-		}
+		} else if([[NSWorkspace sharedWorkspace] selectFile:path inFileViewerRootedAtPath:rootPath])
+			return;
 	}
 	NSBeep();
 }
@@ -410,25 +403,20 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 }
 - (IBAction)moveToTrash:(id)sender
 {
-//	BOOL movedAnything = NO;
-	__block BOOL movedAnything = NO;
-	for(PGNode *const node in self.selectedNodes) {
-#if 1
-		[NSWorkspace.sharedWorkspace recycleURLs:@[node.identifier.URL]
-							   completionHandler:^(NSDictionary<NSURL*,NSURL*>* newURLs, NSError* error) {
-			if(nil != error)
-				return;
-
-			movedAnything = YES;
-			[node removeFromDocument];	//	2024/02/29 remove node from model and UI
-		}];
-#else
-		NSString *const path = [[[node identifier] URL] path];
-		if([[NSWorkspace sharedWorkspace] performFileOperation:NSWorkspaceRecycleOperation source:[path stringByDeletingLastPathComponent] destination:@"" files:[NSArray arrayWithObject:[path lastPathComponent]] tag:NULL])
-			movedAnything = YES;
-#endif
-	}
-	if(!movedAnything) NSBeep();	//	2021/07/21 this might be too early (block not completed yet)
+	//	2026/10/28 the completion handler runs on an arbitrary queue, so the nodes
+	//	are removed on the main queue; the beep was decided before it had run
+	NSArray<PGNode *> *const nodes = self.selectedNodes.allObjects;
+	NSMutableArray<NSURL *> *const URLs = [NSMutableArray array];
+	for(PGNode *const node in nodes)
+		if(node.identifier.isFileIdentifier && node.identifier.URL) [URLs addObject:node.identifier.URL];
+	if(!URLs.count) return NSBeep();
+	[NSWorkspace.sharedWorkspace recycleURLs:URLs completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if(error) NSBeep();
+			for(PGNode *const node in nodes)
+				if(node.identifier.URL && newURLs[node.identifier.URL]) [node removeFromDocument];
+		});
+	}];
 }
 
 //	MARK: -
@@ -1659,8 +1647,13 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	//	instance. Solution: provide context to the notification callback by supplying the
 	//	active document value. See the corresponding code in
 	//	-[PGThumbnailController displayControllerActiveNodeDidChange:]
+	//	2026/10/28 _activeNode is nil after the last image has been removed (and the
+	//	literal used before threw for a nil value)
+	NSMutableDictionary *const userInfo = [NSMutableDictionary dictionary];
+	if(_activeDocument) userInfo[@"PGDocument"] = _activeDocument;
+	if(_activeNode) userInfo[@"PGNode"] = _activeNode;
 	[self PG_postNotificationName:PGDisplayControllerActiveNodeDidChangeNotification
-						 userInfo:@{ @"PGDocument":_activeDocument, @"PGNode":_activeNode }];
+						 userInfo:userInfo];
 //	[self PG_postNotificationName:PGDisplayControllerActiveNodeDidChangeNotification];
 
 	return YES;

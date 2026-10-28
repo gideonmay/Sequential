@@ -127,6 +127,10 @@ StringAtDepth(NSInteger depth) {
 
 #endif
 
+//	2026/10/28 added: limits for extracting an archive entry into memory
+static off_t const PGArchiveEntryMaximumByteSize = 512ll << 20;
+static off_t const PGArchiveEntryMaximumThumbnailByteSize = 64ll << 20;
+
 @implementation PGArchiveAdapter
 
 //	returns an array containing the child nodes which represent all objects
@@ -153,6 +157,7 @@ StringAtDepth(NSInteger depth) {
 			//	entry of a solid archive decompresses everything before it
 			if(!_addedLoadingThumbnail && dc.loadingProgressWantsThumbnail &&
 			   ![_archive entryIsDirectory:(int) i] && ![_archive entryIsEncrypted:(int) i] &&
+			   [_archive representativeSizeOfEntry:(int) i] <= PGArchiveEntryMaximumThumbnailByteSize &&
 			   [[UTType typeWithFilenameExtension:entryPath.pathExtension] conformsToType:UTTypeImage]) {
 				_addedLoadingThumbnail = YES;
 				NSData *data;
@@ -466,8 +471,9 @@ StringAtDepth(NSInteger depth) {
 #endif
 		{
 			off_t const value = [archive representativeSizeOfEntry:entry];
-			NSParameterAssert(value >= 0);	//	the following cast should be safe
-			_dataByteSize = (uint64_t) value;	//	cast signed 64-bit int to unsigned 64-bit int
+			//	2026/10/28 a malicious archive can claim a size which becomes negative
+			//	here (eg, 2^64-1); this was an assertion, which crashed the app
+			_dataByteSize = value > 0 ? (uint64_t) value : 0;
 		}
 	}
 	return self;
@@ -478,6 +484,9 @@ StringAtDepth(NSInteger depth) {
 - (NSData *)data
 {
 //NSLog(@"PGArchiveDataProvider -data for entry %d", _entry);
+	//	2026/10/28 entries are extracted into memory, so refuse absurd sizes (eg,
+	//	decompression bombs)
+	if(_dataByteSize > PGArchiveEntryMaximumByteSize) return nil;
 	@synchronized(_archive) {
 		return [_archive contentsOfEntry:_entry]; // TODO: Handle password issues.
 	}
