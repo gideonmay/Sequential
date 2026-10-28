@@ -663,19 +663,6 @@
 	<string>2.4.0</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>URL</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>http</string>
-				<string>https</string>
-				<string>ftp</string>
-			</array>
-		</dict>
-	</array>
 	<key>CFBundleVersion</key>
 	<string>2.4.0</string>
 	<key>LSApplicationCategoryType</key>
@@ -692,6 +679,8 @@
 		<key>x86_64</key>
 		<string>10.6</string>
 	</dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Sequential uses the Finder to show files and to switch to it.</string>
 	<key>NSMainNibFile</key>
 	<string>PGMenu</string>
 	<key>NSPrincipalClass</key>
@@ -970,12 +959,6 @@
 	<key>SUEnableAutomaticChecks</key>
 	<false/>
 	<key>SUEnableSystemProfiling</key>
-	<false/>
-	<key>SUFeedURL</key>
-	<string>http://www.sequentialx.com/sequential.xml</string>
-	<key>SUPublicDSAKeyFile</key>
-	<string>dsa_pub.pem</string>
-	<key>SUShowReleaseNotes</key>
 	<false/>
 </dict>
 </plist>

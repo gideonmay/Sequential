@@ -164,6 +164,19 @@ static int maxheader=0;
 	if(hasinitialized) return;
 	hasinitialized=YES;
 
+	// 2026/10/28 Sequential: only the parsers for the archive types Sequential opens
+	// (zip/cbz, rar/cbr, 7z, and .001 split files); content sniffing could otherwise
+	// hand any file with one of those extensions to one of ~60 other parsers, including
+	// libxad's old C code, which greatly increased the attack surface for malicious files
+	parserclasses=[[NSMutableArray arrayWithObjects:
+		[XADZipParser class],
+		[XADRARParser class],
+		[XADRAR5Parser class],
+		[XAD7ZipParser class],
+		[XADZipMultiPartParser class],
+		[XADSplitFileParser class],
+	nil] retain];
+#if 0	// the original list
 	parserclasses=[[NSMutableArray arrayWithObjects:
 		// Common formats
 		[XADZipParser class],
@@ -239,6 +252,7 @@ static int maxheader=0;
 		// LibXAD
 		[XADLibXADParser class],
 	nil] retain];
+#endif
 
     // These classes can detect themselves incorrectly if one archive is placed in another
     parsersWithFloatingSignaturesClasses = [[NSArray arrayWithObjects:

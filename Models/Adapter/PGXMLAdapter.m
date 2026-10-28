@@ -46,7 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 - (NSXMLDocument *)XMLDocument
 {
-	if(!_XMLDocument) _XMLDocument = [[NSXMLDocument alloc] initWithData:self.data options:NSXMLNodeOptionsNone error:NULL];
+	if(!_XMLDocument) _XMLDocument = [[NSXMLDocument alloc] initWithData:self.data options:NSXMLNodeLoadExternalEntitiesNever error:NULL];	//	2026/10/28 was NSXMLNodeOptionsNone
 #if __has_feature(objc_arc)
 	return _XMLDocument;
 #else
@@ -113,7 +113,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 		NSString *const title = [item elementsForName:@"title"].lastObject.stringValue;
 		NSString *const URLString = [[item elementsForLocalName:@"content" URI:@"http://search.yahoo.com/mrss"].lastObject attributeForName:@"url"].stringValue;
 
-		PGDisplayableIdentifier *const ident = [NSURL URLWithString:URLString].PG_displayableIdentifier;
+		//	2026/10/28 only web URLs (a feed could otherwise list local file:// URLs)
+		NSURL *const URL = URLString ? [NSURL URLWithString:URLString] : nil;
+		NSString *const scheme = URL.scheme.lowercaseString;
+		if(![scheme isEqualToString:@"http"] && ![scheme isEqualToString:@"https"]) continue;
+		PGDisplayableIdentifier *const ident = URL.PG_displayableIdentifier;
 		ident.customDisplayName = title;
 #if __has_feature(objc_arc)
 		PGNode *const node = [[PGNode alloc] initWithParent:self identifier:ident];
