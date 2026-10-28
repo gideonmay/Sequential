@@ -22,7 +22,7 @@
                 <textField toolTip="Current viewable object index and count of all viewable objects." horizontalHuggingPriority="251" verticalHuggingPriority="750" fixedFrame="YES" tag="2000" allowsExpansionToolTips="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T6U-mv-Saw" userLabel="image progress">
                     <rect key="frame" x="-2" y="7.5" width="120" height="16"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES"/>
-                    <textFieldCell key="cell" lineBreakMode="clipping" alignment="right" title="1999/1999" id="XEh-hW-vQM" customClass="PGFullSizeContentTextFieldCell">
+                    <textFieldCell key="cell" lineBreakMode="clipping" alignment="right" id="XEh-hW-vQM" customClass="PGFullSizeContentTextFieldCell">
                         <font key="font" metaFont="systemBold"/>
                         <color key="textColor" name="windowFrameTextColor" catalog="System" colorSpace="catalog"/>
                         <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
