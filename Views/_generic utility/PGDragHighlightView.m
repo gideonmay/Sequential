@@ -54,8 +54,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #else
 		_highlightPath = [[NSBezierPath bezierPathWithRect:NSInsetRect([self bounds], 2.0f, 2.0f)] retain];
 #endif
+#if defined(__MAC_11_0) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_11_0
+        _highlightPath.lineJoinStyle = kCGLineJoinRound;
+#else
+        _highlightPath.lineJoinStyle = NSRoundLineJoinStyle;
+#endif
 		_highlightPath.lineWidth = 4;
-		_highlightPath.lineJoinStyle = NSRoundLineJoinStyle;
 	}
 
 	NSInteger i;

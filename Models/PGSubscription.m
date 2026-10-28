@@ -337,7 +337,7 @@ static void PGEventStreamCallback(ConstFSEventStreamRef streamRef, PGBranchSubsc
 		&context, (CFArrayRef)[NSArray arrayWithObject:path], kFSEventStreamEventIdSinceNow,
 		0.0f, kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagNoDefer);
 #endif
-	FSEventStreamScheduleWithRunLoop(_eventStream, [[NSRunLoop currentRunLoop] getCFRunLoop], kCFRunLoopCommonModes);
+	FSEventStreamSetDispatchQueue(_eventStream, dispatch_get_main_queue());
 	FSEventStreamStart(_eventStream);
 }
 - (void)unsubscribe
@@ -381,3 +381,4 @@ static void PGEventStreamCallback(ConstFSEventStreamRef streamRef, PGBranchSubsc
 }
 
 @end
+

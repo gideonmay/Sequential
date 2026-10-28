@@ -23,6 +23,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGImageSaveAlert.h"
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 // Models
 #import "PGNode.h"
@@ -195,7 +196,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #endif
 
 	_openPanel.directoryURL		=	_rootNode.identifier.URL.URLByDeletingLastPathComponent;
-	_openPanel.allowedFileTypes	=	nil;
+	_openPanel.allowedContentTypes	=	@[]; // previously allowedFileTypes = nil
 	if(window) {
 		[_openPanel beginSheetModalForWindow:window completionHandler:^(NSModalResponse result) {
 			[self openPanelDidEnd:_openPanel returnCode:result contextInfo:NULL];
@@ -456,3 +457,4 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 }
 
 @end
+
