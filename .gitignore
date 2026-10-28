@@ -34,3 +34,7 @@ build/
 
 # Xcode build output
 DerivedData/
+
+# Local notes (not shared)
+CLAUDE.md
+README.local.md
