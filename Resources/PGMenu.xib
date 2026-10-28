@@ -411,6 +411,30 @@ CA
                                                 <action selector="changePageTransitionStyle:" target="-1" id="PTx-04-act"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem title="Door" tag="31" id="PTz-do-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-do-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Book" tag="29" id="PTz-bk-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-bk-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Shatter" tag="28" id="PTz-sh-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-sh-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Melt" tag="27" id="PTz-ml-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-ml-act"/>
+                                            </connections>
+                                        </menuItem>
                                         <menuItem isSeparatorItem="YES" id="PTx-s1-itm"/>
                                         <menuItem title="Iris" tag="10" id="PTx-05-itm">
                                             <modifierMask key="keyEquivalentModifierMask"/>
@@ -434,6 +458,18 @@ CA
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="changePageTransitionStyle:" target="-1" id="PTy-mo-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Rain" tag="21" id="PTy-rn-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTy-rn-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Clock Wipe" tag="30" id="PTz-cw-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-cw-act"/>
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="PTx-s2-itm"/>
@@ -477,6 +513,36 @@ CA
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="changePageTransitionStyle:" target="-1" id="PTy-sw-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Pixelate" tag="22" id="PTz-px-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-px-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Blur" tag="23" id="PTz-bl-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-bl-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Dissolve with Noise" tag="24" id="PTz-nd-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-nd-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Kaleidoscope" tag="25" id="PTz-ka-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-ka-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Heat Haze" tag="26" id="PTz-hh-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTz-hh-act"/>
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="PTx-s3-itm"/>

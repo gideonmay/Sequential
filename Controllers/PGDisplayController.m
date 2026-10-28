@@ -323,6 +323,21 @@ static CATransform3D PGCubeFaceTransform(CGFloat angle, CGFloat width)
 	return CATransform3DTranslate(t, 0.0f, 0.0f, width / 2.0f);
 }
 
+//	2026/10/28 added: helpers for the Core Image transitions
+static CIImage *PGDissolve(CIImage *from, CIImage *to, CGFloat t)
+{
+	return [from imageByApplyingFilter:@"CIDissolveTransition" withInputParameters:@{kCIInputTargetImageKey: to, kCIInputTimeKey: @(t)}];
+}
+static CIImage *PGNoiseImage(void)	//	grey random noise of infinite extent
+{
+	return [[CIFilter filterWithName:@"CIRandomGenerator"].outputImage imageByApplyingFilter:@"CIColorControls" withInputParameters:@{kCIInputSaturationKey: @0.0f}];
+}
+static BOOL PGPageTransitionUsesCoreImage(PGPageTransitionStyle style)
+{
+	return (style >= PGPageCurlPageTransition && style <= PGSwirlPageTransition) ||
+		(style >= PGPixelatePageTransition && style <= PGHeatHazePageTransition);
+}
+
 //	2026/10/28 added: the Core Image transitions, as a block which returns the
 //	frame at time t (0...1); the images and geometry are in pixels
 typedef CIImage *(^PGPageTransitionFrame)(CGFloat t);
@@ -367,6 +382,44 @@ static PGPageTransitionFrame PGPageTransitionFrameBlock(PGPageTransitionStyle st
 			filter = [CIFilter filterWithName:@"CIFlashTransition" withInputParameters:@{
 				kCIInputExtentKey: extent, kCIInputCenterKey: center}];
 			break;
+		case PGPixelatePageTransition:
+			return ^CIImage *(CGFloat t) {
+				CGFloat const blocks = 1.0f + side * 0.08f * (1.0f - fabs(2.0f * t - 1.0f));
+				CIImage *const mix = PGDissolve(oldImage, newImage, t);
+				return [[mix.imageByClampingToExtent imageByApplyingFilter:@"CIPixellate" withInputParameters:@{
+					kCIInputCenterKey: center, kCIInputScaleKey: @(blocks)}] imageByCroppingToRect:bounds];
+			};
+		case PGBlurPageTransition:
+			return ^CIImage *(CGFloat t) {
+				CGFloat const radius = side * 0.05f * (1.0f - fabs(2.0f * t - 1.0f));
+				CIImage *const mix = PGDissolve(oldImage, newImage, t);
+				return [[mix.imageByClampingToExtent imageByApplyingGaussianBlurWithSigma:radius] imageByCroppingToRect:bounds];
+			};
+		case PGNoiseDissolvePageTransition: {
+			CIImage *const mask = [[PGNoiseImage() imageByApplyingTransform:CGAffineTransformMakeScale(6.0f, 6.0f)] imageByCroppingToRect:bounds];
+			filter = [CIFilter filterWithName:@"CIDisintegrateWithMaskTransition" withInputParameters:@{
+				kCIInputMaskImageKey: mask, @"inputShadowRadius": @(side * 0.02f),
+				@"inputShadowDensity": @0.6f, @"inputShadowOffset": [CIVector vectorWithX:0.0f Y:-side * 0.01f]}];
+			break;
+		}
+		case PGKaleidoscopePageTransition:
+			return ^CIImage *(CGFloat t) {
+				CGFloat const strength = 1.0f - fabs(2.0f * t - 1.0f);
+				CIImage *const mix = PGDissolve(oldImage, newImage, t);
+				CIImage *const kaleidoscope = [[mix.imageByClampingToExtent imageByApplyingFilter:@"CIKaleidoscope" withInputParameters:@{
+					@"inputCount": @6, kCIInputCenterKey: center, kCIInputAngleKey: @(t * M_PI * dir)}] imageByCroppingToRect:bounds];
+				return [PGDissolve(mix, kaleidoscope, MIN(1.0f, strength * 1.5f)) imageByCroppingToRect:bounds];
+			};
+		case PGHeatHazePageTransition: {
+			CIImage *const haze = [[PGNoiseImage() imageByApplyingTransform:CGAffineTransformMakeScale(12.0f, 12.0f)] imageByApplyingGaussianBlurWithSigma:6.0f];
+			return ^CIImage *(CGFloat t) {
+				CGFloat const strength = sin(t * M_PI);
+				CIImage *const drifting = [haze imageByApplyingTransform:CGAffineTransformMakeTranslation(0.0f, t * side * 0.4f)];
+				CIImage *const mix = PGDissolve(oldImage, newImage, t);
+				return [[mix.imageByClampingToExtent imageByApplyingFilter:@"CIDisplacementDistortion" withInputParameters:@{
+					@"inputDisplacementImage": drifting, kCIInputScaleKey: @(strength * side * 0.06f)}] imageByCroppingToRect:bounds];
+			};
+		}
 		case PGSwirlPageTransition: {
 			//	the old page twists away while the new one untwists into place
 			CGFloat const radius = hypot(CGRectGetWidth(bounds), CGRectGetHeight(bounds)) / 2.0f;
@@ -1607,7 +1660,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	PGPageTransitionStyle style = [d integerForKey:PGPageTransitionStyleKey];
 	if(PGRandomPageTransition == style) style = 1 + arc4random_uniform(PGLastPageTransition);
 	CFTimeInterval const duration = [d integerForKey:PGPageTransitionDurationKey] / 1000.0;
-	BOOL const usesFilter = style >= PGPageCurlPageTransition && style <= PGSwirlPageTransition;
+	BOOL const usesFilter = PGPageTransitionUsesCoreImage(style);
 
 	PGPageTransitionView *const view = [[PGPageTransitionView alloc] initWithFrame:_clipView.frame];
 	CALayer *const root = [CALayer layer];
@@ -1625,7 +1678,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	oldLayer.contents = (__bridge id)before.CGImage;
 	newLayer.contents = (__bridge id)after.CGImage;
 	//	the outgoing page slides off the top of the incoming page when revealing
-	if(PGRevealPageTransition == style) {
+	if(PGRevealPageTransition == style || PGDoorPageTransition == style) {
 		[root addSublayer:newLayer];
 		[root addSublayer:oldLayer];
 	} else {
@@ -1805,6 +1858,217 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 			}
 			newLayer.hidden = YES;
 			[root addSublayer:mosaic];
+			break;
+		}
+		case PGRainPageTransition: {
+			//	the new page runs down over the old one in streaks of different
+			//	widths, which start at random and fall at different speeds, like
+			//	rain on a window; every streak reaches the bottom by the end
+			CALayer *const mask = [CALayer layer];
+			mask.frame = layerFrame;
+			CFTimeInterval const now = [mask convertTime:CACurrentMediaTime() fromLayer:nil];
+			for(CGFloat x = 0.0f; x < w; ) {
+				CGFloat const streakWidth = MIN(w - x, round((4.0f + arc4random_uniform(15)) * scale) / scale);
+				CALayer *const streak = [CALayer layer];
+				streak.anchorPoint = CGPointMake(0.5f, 1.0f);	//	grows down from the top
+				streak.frame = CGRectMake(x, 0.0f, streakWidth, h);
+				streak.backgroundColor = CGColorGetConstantColor(kCGColorBlack);
+				streak.cornerRadius = streakWidth / 2.0f;
+				CFTimeInterval const delay = duration * 0.5 * arc4random_uniform(1000) / 1000.0;
+				CABasicAnimation *const fall = [CABasicAnimation animationWithKeyPath:@"transform.scale.y"];
+				fall.fromValue = @0.0f;
+				fall.toValue = @1.0f;
+				fall.beginTime = now + delay;
+				fall.duration = (duration - delay) * (0.6 + 0.4 * arc4random_uniform(1000) / 1000.0);
+				fall.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
+				fall.fillMode = kCAFillModeBoth;
+				fall.removedOnCompletion = NO;
+				[streak addAnimation:fall forKey:@"fall"];
+				[mask addSublayer:streak];
+				x += streakWidth;
+			}
+			newLayer.mask = mask;
+			break;
+		}
+		case PGMeltPageTransition: {
+			//	the old page runs down off the bottom in strips of different widths
+			oldLayer.hidden = YES;
+			CALayer *const strips = [CALayer layer];
+			strips.frame = layerFrame;
+			CFTimeInterval const now = [strips convertTime:CACurrentMediaTime() fromLayer:nil];
+			for(CGFloat x = 0.0f; x < w; ) {
+				CGFloat const stripWidth = MIN(w - x, round((6.0f + arc4random_uniform(16)) * scale) / scale);
+				CALayer *const strip = [CALayer layer];
+				strip.anchorPoint = CGPointMake(0.5f, 1.0f);
+				strip.frame = CGRectMake(x, 0.0f, stripWidth, h);
+				strip.contents = oldLayer.contents;
+				strip.contentsRect = CGRectMake(x / w, 0.0f, stripWidth / w, 1.0f);
+				strip.contentsScale = scale;
+				CFTimeInterval const delay = duration * 0.4 * arc4random_uniform(1000) / 1000.0;
+				CABasicAnimation *const fall = [CABasicAnimation animationWithKeyPath:@"transform.translation.y"];
+				fall.fromValue = @0.0f;
+				fall.toValue = @(-h * (1.1f + 0.5f * arc4random_uniform(1000) / 1000.0f));
+				CABasicAnimation *const stretch = [CABasicAnimation animationWithKeyPath:@"transform.scale.y"];
+				stretch.fromValue = @1.0f;
+				stretch.toValue = @1.6f;
+				CAAnimationGroup *const group = [CAAnimationGroup animation];
+				group.animations = @[fall, stretch];
+				group.beginTime = now + delay;
+				group.duration = duration - delay;
+				group.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
+				group.fillMode = kCAFillModeBoth;
+				group.removedOnCompletion = NO;
+				[strip addAnimation:group forKey:@"melt"];
+				[strips addSublayer:strip];
+				x += stripWidth;
+			}
+			[root addSublayer:strips];
+			break;
+		}
+		case PGShatterPageTransition: {
+			//	the old page breaks into triangular shards which fly away from the
+			//	point of impact and fall
+			oldLayer.hidden = YES;
+			CALayer *const shards = [CALayer layer];
+			shards.frame = layerFrame;
+			CFTimeInterval const now = [shards convertTime:CACurrentMediaTime() fromLayer:nil];
+			CGPoint const impact = CGPointMake(dir > 0 ? w * 0.65f : w * 0.35f, h * 0.55f);
+			CGFloat const diagonal = hypot(w, h);
+			NSUInteger const columns = 9, rows = MAX(1, lround(columns * h / w));
+			for(NSUInteger row = 0; row < rows; row++) for(NSUInteger column = 0; column < columns; column++) {
+				CGFloat const x0 = round(w * column / columns * scale) / scale, x1 = round(w * (column + 1) / columns * scale) / scale;
+				CGFloat const y0 = round(h * row / rows * scale) / scale, y1 = round(h * (row + 1) / rows * scale) / scale;
+				CGFloat const cw = x1 - x0, ch = y1 - y0;
+				BOOL const flipDiagonal = (row + column) % 2;
+				for(NSUInteger half = 0; half < 2; half++) {
+					CGPoint corners[3];
+					if(!flipDiagonal) {
+						if(!half) { corners[0] = CGPointMake(0, 0); corners[1] = CGPointMake(cw, 0); corners[2] = CGPointMake(0, ch); }
+						else { corners[0] = CGPointMake(cw, 0); corners[1] = CGPointMake(cw, ch); corners[2] = CGPointMake(0, ch); }
+					} else {
+						if(!half) { corners[0] = CGPointMake(0, 0); corners[1] = CGPointMake(cw, ch); corners[2] = CGPointMake(0, ch); }
+						else { corners[0] = CGPointMake(0, 0); corners[1] = CGPointMake(cw, 0); corners[2] = CGPointMake(cw, ch); }
+					}
+					CALayer *const shard = [CALayer layer];
+					shard.frame = CGRectMake(x0, y0, cw, ch);
+					shard.contents = oldLayer.contents;
+					shard.contentsRect = CGRectMake(x0 / w, y0 / h, cw / w, ch / h);
+					shard.contentsScale = scale;
+					CAShapeLayer *const outline = [CAShapeLayer layer];
+					outline.frame = shard.bounds;
+					CGMutablePathRef const path = CGPathCreateMutable();
+					CGPathAddLines(path, NULL, corners, 3);
+					CGPathCloseSubpath(path);
+					outline.path = path;
+					CGPathRelease(path);
+					shard.mask = outline;
+
+					CGPoint const centroid = CGPointMake(x0 + (corners[0].x + corners[1].x + corners[2].x) / 3.0f,
+														 y0 + (corners[0].y + corners[1].y + corners[2].y) / 3.0f);
+					CGFloat const dx = centroid.x - impact.x, dy = centroid.y - impact.y;
+					CGFloat const distance = MAX(1.0f, hypot(dx, dy));
+					CGFloat const speed = diagonal * (0.3f + 0.5f * arc4random_uniform(1000) / 1000.0f);
+					NSMutableArray *const path2 = [NSMutableArray array];
+					for(NSUInteger k = 0; k <= 6; k++) {
+						CGFloat const tt = k / 6.0f;
+						[path2 addObject:[NSValue valueWithSize:NSMakeSize(dx / distance * speed * tt,
+							dy / distance * speed * tt - h * 1.4f * tt * tt)]];
+					}
+					CAKeyframeAnimation *const fly = [CAKeyframeAnimation animationWithKeyPath:@"transform.translation"];
+					fly.values = path2;
+					CABasicAnimation *const spin = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+					spin.fromValue = @0.0f;
+					spin.toValue = @((arc4random_uniform(2) ? 1.0f : -1.0f) * M_PI * (1.0f + arc4random_uniform(1000) / 1000.0f));
+					CAKeyframeAnimation *const fade = [CAKeyframeAnimation animationWithKeyPath:@"opacity"];
+					fade.values = @[@1.0f, @1.0f, @0.0f];
+					fade.keyTimes = @[@0.0f, @0.6f, @1.0f];
+					CAAnimationGroup *const group = [CAAnimationGroup animation];
+					group.animations = @[fly, spin, fade];
+					CFTimeInterval const delay = duration * 0.3 * distance / diagonal;	//	spreads out from the impact
+					group.beginTime = now + delay;
+					group.duration = duration - delay;
+					group.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
+					group.fillMode = kCAFillModeBoth;
+					group.removedOnCompletion = NO;
+					[shard addAnimation:group forKey:@"shatter"];
+					[shards addSublayer:shard];
+				}
+			}
+			[root addSublayer:shards];
+			break;
+		}
+		case PGBookPageTransition: {
+			//	half of the old page turns over around the middle, like a page of
+			//	a book; its back shows the other half of the new page
+			oldLayer.hidden = YES;
+			newLayer.hidden = YES;
+			CATransform3D bookPerspective = CATransform3DIdentity;
+			bookPerspective.m34 = -1.0f / (w * 2.5f);	//	the page lifts towards the reader
+			root.sublayerTransform = bookPerspective;
+			CGFloat const half = w / 2.0f;
+			CGRect const leftUnit = CGRectMake(0.0f, 0.0f, 0.5f, 1.0f), rightUnit = CGRectMake(0.5f, 0.0f, 0.5f, 1.0f);
+			CGRect const leftFrame = CGRectMake(0.0f, 0.0f, half, h), rightFrame = CGRectMake(half, 0.0f, w - half, h);
+			CALayer *(^const halfLayer)(id, CGRect, CGRect) = ^CALayer *(id contents, CGRect unit, CGRect frame) {
+				CALayer *const layer = [CALayer layer];
+				layer.frame = frame;
+				layer.contents = contents;
+				layer.contentsRect = unit;
+				layer.contentsScale = scale;
+				return layer;
+			};
+			//	going forwards (left to right) the right half turns over to the left
+			BOOL const turnsRightHalf = dir > 0;
+			[root addSublayer:halfLayer(oldLayer.contents, turnsRightHalf ? leftUnit : rightUnit, turnsRightHalf ? leftFrame : rightFrame)];
+			[root addSublayer:halfLayer(newLayer.contents, turnsRightHalf ? rightUnit : leftUnit, turnsRightHalf ? rightFrame : leftFrame)];
+			CATransformLayer *const leaf = [CATransformLayer layer];
+			leaf.anchorPoint = CGPointMake(turnsRightHalf ? 0.0f : 1.0f, 0.5f);
+			leaf.frame = turnsRightHalf ? rightFrame : leftFrame;
+			CALayer *const front = halfLayer(oldLayer.contents, turnsRightHalf ? rightUnit : leftUnit, leaf.bounds);
+			front.doubleSided = NO;
+			CALayer *const back = halfLayer(newLayer.contents, turnsRightHalf ? leftUnit : rightUnit, leaf.bounds);
+			back.doubleSided = NO;
+			back.transform = CATransform3DMakeRotation(M_PI, 0.0f, 1.0f, 0.0f);
+			[leaf addSublayer:front];
+			[leaf addSublayer:back];
+			[root addSublayer:leaf];
+			PGAddPageTransitionAnimation(leaf, @"transform.rotation.y", @0.0f, @(turnsRightHalf ? -M_PI : M_PI));
+			break;
+		}
+		case PGClockWipePageTransition: {
+			//	a thick circular stroke whose end sweeps round from 12 o'clock
+			CAShapeLayer *const mask = [CAShapeLayer layer];
+			mask.frame = layerFrame;
+			CGFloat const radius = hypot(w, h) / 2.0f + 2.0f;
+			CGMutablePathRef const path = CGPathCreateMutable();
+			CGPathAddArc(path, NULL, w / 2.0f, h / 2.0f, radius / 2.0f, M_PI_2, M_PI_2 - 2.0f * M_PI * dir, dir > 0);
+			mask.path = path;
+			CGPathRelease(path);
+			mask.fillColor = NULL;
+			mask.strokeColor = CGColorGetConstantColor(kCGColorBlack);
+			mask.lineWidth = radius;
+			newLayer.mask = mask;
+			PGAddPageTransitionAnimation(mask, @"strokeEnd", @0.0f, @1.0f);
+			break;
+		}
+		case PGDoorPageTransition: {
+			//	the old page swings away into the screen on its hinge; it's in its
+			//	own container so that it's flattened before being composited: as a
+			//	sibling of the new page, it went behind it as soon as it turned away
+			CALayer *const door = [CALayer layer];
+			door.frame = layerFrame;
+			CATransform3D doorPerspective = CATransform3DIdentity;
+			doorPerspective.m34 = -1.0f / (w * 0.9f);	//	strong, or the turn reads as a squeeze
+			door.sublayerTransform = doorPerspective;
+			[CATransaction setDisableActions:YES];	//	only the rotation is animated
+			[oldLayer removeFromSuperlayer];
+			oldLayer.anchorPoint = CGPointMake(dir > 0 ? 0.0f : 1.0f, 0.5f);
+			oldLayer.frame = layerFrame;
+			[door addSublayer:oldLayer];
+			[root addSublayer:door];
+			[CATransaction setDisableActions:NO];
+			//	its free edge swings away from the viewer: depth z' = -x sin(angle)
+			PGAddPageTransitionAnimation(oldLayer, @"transform.rotation.y", @0.0f, @(dir > 0 ? 1.45f : -1.45f));
+			PGAddPageTransitionKeyframes(oldLayer, @"opacity", @[@1.0f, @1.0f, @0.0f]);
 			break;
 		}
 		default:

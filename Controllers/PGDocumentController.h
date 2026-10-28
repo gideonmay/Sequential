@@ -107,7 +107,18 @@ typedef NS_ENUM(NSInteger, PGPageTransitionStyle) {	//	2026/10/28 added
 	PGFlashPageTransition = 18,
 	PGSwirlPageTransition = 19,
 	PGMosaicPageTransition = 20,	//	Core Animation again
-	PGLastPageTransition = PGMosaicPageTransition,
+	PGRainPageTransition = 21,
+	PGPixelatePageTransition = 22,	//	Core Image
+	PGBlurPageTransition = 23,
+	PGNoiseDissolvePageTransition = 24,
+	PGKaleidoscopePageTransition = 25,
+	PGHeatHazePageTransition = 26,
+	PGMeltPageTransition = 27,	//	Core Animation again
+	PGShatterPageTransition = 28,
+	PGBookPageTransition = 29,
+	PGClockWipePageTransition = 30,
+	PGDoorPageTransition = 31,
+	PGLastPageTransition = PGDoorPageTransition,
 	PGRandomPageTransition = 99,	//	a different one for every page turn
 };
 typedef NS_ENUM(NSUInteger, PGImageScaleConstraint) {
