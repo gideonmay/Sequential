@@ -110,6 +110,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 - (id)activeNodeForThumbnailView:(PGThumbnailView *)sender;	//	2023/11/23
 - (BOOL)thumbnailView:(PGThumbnailView *)sender isParentOfActiveNode:(id)item;
 
+@optional
+- (NSMenu *)contextMenuForThumbnailView:(PGThumbnailView *)sender;	//	2026/10/28 added; for the selection
+
 @end
 
 @protocol PGThumbnailViewDelegate <NSObject>

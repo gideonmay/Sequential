@@ -23,6 +23,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGThumbnailController.h"
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 // Models
 #import "PGDocument.h"
@@ -41,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGDisplayController.h"
 #import "PGDocumentController.h"
 #import "PGFullSizeContentController.h"
+#import "PGImageSaveAlert.h"	//	2026/10/28 added
 
 // Other Sources
 #import "PGAppKitAdditions.h"
@@ -78,6 +80,13 @@ NSString *const PGThumbnailControllerContentInsetDidChangeNotification = @"PGThu
 - (void)_updateWindowFrame;
 - (PGNode *)_firstViewableNodeInNode:(PGNode *)node levels:(NSUInteger)levels;	//	2026/10/28 added
 - (void)_showFirstViewableNodeInNode:(PGNode *)node;	//	2026/10/28 added
+- (IBAction)_revealInFinder:(NSMenuItem *)sender;	//	2026/10/28 added: context menu
+- (IBAction)_openWithDefaultApp:(NSMenuItem *)sender;
+- (IBAction)_copyItems:(NSMenuItem *)sender;
+- (IBAction)_copyPaths:(NSMenuItem *)sender;
+- (IBAction)_saveImagesTo:(NSMenuItem *)sender;
+- (IBAction)_setAsDesktopPicture:(NSMenuItem *)sender;
+- (IBAction)_moveToTrash:(NSMenuItem *)sender;
 
 @end
 
@@ -555,6 +564,128 @@ NSLog(@"-mouseMoved:");
 {
 	PGNode *const parent = ((PGNode *)item).parentNode;
 	return self.document.node == parent && !parent.isViewable ? nil : parent;
+}
+//	2026/10/28 added: film strip context menu; the menu's items carry the
+//	nodes they act on because the selection can change while the menu is open
+//	(eg, selecting a folder shows its first image, which selects that image)
+
+static NSURL *PGFileURLOfNode(PGNode *node)	//	nil for an entry in an archive
+{
+	PGResourceIdentifier *const ident = node.identifier;
+	return ident.isFileIdentifier ? ident.URL : nil;
+}
+static NSURL *PGNearestFileURLOfNode(PGNode *node)	//	an archive entry's archive
+{
+	for(PGNode *n = node; n; n = n.parentNode) {
+		NSURL *const URL = PGFileURLOfNode(n);
+		if(URL) return URL;
+	}
+	return nil;
+}
+static NSArray<NSURL *> *PGFileURLsOfNodes(NSArray<PGNode *> *nodes, BOOL nearest)
+{
+	NSMutableOrderedSet<NSURL *> *const URLs = [NSMutableOrderedSet orderedSet];
+	for(PGNode *const node in nodes) {
+		NSURL *const URL = nearest ? PGNearestFileURLOfNode(node) : PGFileURLOfNode(node);
+		if(URL) [URLs addObject:URL];
+	}
+	return URLs.array;
+}
+
+- (NSMenu *)contextMenuForThumbnailView:(PGThumbnailView *)sender
+{
+	NSArray *const items = sender.items;
+	NSArray<PGNode *> *const nodes = [sender.selection.allObjects sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
+		NSUInteger const i = [items indexOfObjectIdenticalTo:a], j = [items indexOfObjectIdenticalTo:b];
+		return i < j ? NSOrderedAscending : i > j ? NSOrderedDescending : NSOrderedSame;
+	}];
+	if(!nodes.count) return nil;
+	BOOL const allOnDisk = PGFileURLsOfNodes(nodes, NO).count == nodes.count;
+	BOOL const anyOnDisk = PGFileURLsOfNodes(nodes, YES).count > 0;
+	BOOL const singleImage = 1 == nodes.count && nodes[0].isViewable;
+
+	NSMenu *const menu = [[NSMenu alloc] initWithTitle:@""];
+	menu.autoenablesItems = NO;
+	void (^const add)(NSString *, SEL, BOOL) = ^(NSString *title, SEL action, BOOL enabled) {
+		NSMenuItem *const item = [menu addItemWithTitle:title action:action keyEquivalent:@""];
+		item.target = self;
+		item.representedObject = nodes;
+		item.enabled = enabled;
+	};
+	add(NSLocalizedString(@"Show in Finder", @"Film strip context menu item."), @selector(_revealInFinder:), anyOnDisk);
+	add(NSLocalizedString(@"Open with Default App", @"Film strip context menu item."), @selector(_openWithDefaultApp:), allOnDisk);
+	[menu addItem:[NSMenuItem separatorItem]];
+	add(NSLocalizedString(@"Copy", @"Film strip context menu item."), @selector(_copyItems:), allOnDisk || singleImage);
+	add(NSLocalizedString(@"Copy Path", @"Film strip context menu item."), @selector(_copyPaths:), anyOnDisk);
+	[menu addItem:[NSMenuItem separatorItem]];
+	add(NSLocalizedString(@"Save Images To\u2026", @"Film strip context menu item."), @selector(_saveImagesTo:), self.document.node.resourceAdapter.hasNodesWithData);
+	add(NSLocalizedString(@"Set as Desktop Picture", @"Film strip context menu item."), @selector(_setAsDesktopPicture:), singleImage && allOnDisk);
+	[menu addItem:[NSMenuItem separatorItem]];
+	add(NSLocalizedString(@"Move to Trash", @"Film strip context menu item."), @selector(_moveToTrash:), allOnDisk);
+	return menu;
+}
+- (IBAction)_revealInFinder:(NSMenuItem *)sender
+{
+	[[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs:PGFileURLsOfNodes(sender.representedObject, YES)];
+}
+- (IBAction)_openWithDefaultApp:(NSMenuItem *)sender
+{
+	for(NSURL *const URL in PGFileURLsOfNodes(sender.representedObject, NO))
+		if(![[NSWorkspace sharedWorkspace] openURL:URL]) NSBeep();
+}
+- (IBAction)_copyItems:(NSMenuItem *)sender
+{
+	NSArray<PGNode *> *const nodes = sender.representedObject;
+	NSArray<NSURL *> *const URLs = PGFileURLsOfNodes(nodes, NO);
+	NSPasteboard *const pboard = [NSPasteboard generalPasteboard];
+	if(URLs.count == nodes.count) {
+		//	files, which can be pasted in the Finder
+		[pboard clearContents];
+		[pboard writeObjects:URLs];
+	} else {
+		//	an image in an archive: its data in its own format, plus an NSImage
+		//	(TIFF) for apps which don't understand that format
+		PGNode *const node = nodes.firstObject;
+		NSData *const data = node.resourceAdapter.data;
+		NSImage *const image = data ? [[NSImage alloc] initWithData:data] : nil;
+		if(!image) return NSBeep();
+		[pboard clearContents];
+		[pboard writeObjects:@[image]];
+		UTType *const type = [UTType typeWithFilenameExtension:node.identifier.naturalDisplayName.pathExtension];
+		if([type conformsToType:UTTypeImage]) [pboard setData:data forType:type.identifier];
+	}
+}
+- (IBAction)_copyPaths:(NSMenuItem *)sender
+{
+	NSArray<NSString *> *const paths = [PGFileURLsOfNodes(sender.representedObject, YES) valueForKey:@"path"];
+	NSPasteboard *const pboard = [NSPasteboard generalPasteboard];
+	[pboard clearContents];
+	[pboard setString:[paths componentsJoinedByString:@"\n"] forType:NSPasteboardTypeString];
+}
+- (IBAction)_saveImagesTo:(NSMenuItem *)sender
+{
+	[[[PGImageSaveAlert alloc] initWithRoot:self.document.node initialSelection:[NSSet setWithArray:sender.representedObject]]
+		beginSheetForWindow:self.displayController.windowForSheet];
+}
+- (IBAction)_setAsDesktopPicture:(NSMenuItem *)sender
+{
+	NSURL *const URL = PGFileURLOfNode([sender.representedObject firstObject]);
+	NSWorkspace *const ws = [NSWorkspace sharedWorkspace];
+	NSScreen *const screen = [NSScreen PG_mainScreen];
+	if(!URL || ![ws setDesktopImageURL:[URL URLByResolvingSymlinksInPath] forScreen:screen options:[ws desktopImageOptionsForScreen:screen] error:NULL])
+		NSBeep();
+}
+- (IBAction)_moveToTrash:(NSMenuItem *)sender
+{
+	NSArray<PGNode *> *const nodes = sender.representedObject;
+	NSArray<NSURL *> *const URLs = PGFileURLsOfNodes(nodes, NO);
+	[[NSWorkspace sharedWorkspace] recycleURLs:URLs completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if(error) NSBeep();
+			for(PGNode *const node in nodes)
+				if(newURLs[PGFileURLOfNode(node)]) [node removeFromDocument];
+		});
+	}];
 }
 - (void)_showFirstViewableNodeInNode:(PGNode *)node	//	2026/10/28 added
 {

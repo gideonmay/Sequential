@@ -2131,6 +2131,18 @@ NSLog(@"%@", logStr);
 //	if([anEvent modifierFlags] & (NSEventModifierFlagShift | NSEventModifierFlagCommand)) [self toggleSelectionOfItem:item];
 //	else [self selectItem:item byExtendingSelection:NO];
 }
+- (NSMenu *)menuForEvent:(NSEvent *)anEvent	//	2026/10/28 added
+{
+	NSPoint const p = [anEvent PG_locationInView:self];
+	NSUInteger const i = [self indexOfItemAtPoint:p];
+	if(i >= _items.count || ![self mouse:p inRect:self.bounds]) return nil;
+	id const item = _items[i];
+	if(![self.dataSource thumbnailView:self canSelectItem:item]) return nil;
+	//	like the Finder, right-clicking an item outside the selection selects it
+	if(![self _isItemSelected:item]) [self selectItem:item byExtendingSelection:NO];
+	if(![self.dataSource respondsToSelector:@selector(contextMenuForThumbnailView:)]) return nil;
+	return [self.dataSource contextMenuForThumbnailView:self];
+}
 - (void)keyDown:(NSEvent *)anEvent
 {
 	if(anEvent.modifierFlags & NSEventModifierFlagCommand) return [super keyDown:anEvent];

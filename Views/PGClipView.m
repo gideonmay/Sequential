@@ -723,12 +723,24 @@ static inline NSPoint PGPointInRect(NSPoint aPoint, NSRect aRect)
 	_firstMouse = YES;
 	return YES;
 }
+- (BOOL)_popUpDocumentViewMenuForEvent:(NSEvent *)anEvent	//	2026/10/28 added
+{
+	//	eg, the film strip's thumbnails; views without a menu (such as the
+	//	image view, where a secondary click goes to the previous page) return nil
+	NSView *const view = self.documentView;
+	NSMenu *const menu = [view menuForEvent:anEvent];
+	if(!menu) return NO;
+	[NSMenu popUpContextMenu:menu withEvent:anEvent forView:view];
+	return YES;
+}
 - (void)mouseDown:(NSEvent *)anEvent
 {
+	if((anEvent.modifierFlags & NSEventModifierFlagControl) && [self _popUpDocumentViewMenuForEvent:anEvent]) return;	//	2026/10/28 added
 	[self handleMouseDown:anEvent];
 }
 - (void)rightMouseDown:(NSEvent *)anEvent
 {
+	if([self _popUpDocumentViewMenuForEvent:anEvent]) return;	//	2026/10/28 added
 	if(self.window.keyWindow) [self handleMouseDown:anEvent];
 }
 - (void)scrollWheel:(NSEvent *)anEvent
