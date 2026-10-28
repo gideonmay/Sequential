@@ -1591,6 +1591,9 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	PGResourceIdentifier *const ident = node.identifier;
 	NSURL *const URL = ident.isFileIdentifier && node.isViewable ? ident.URL : nil;
 	if(!URL) return NSBeep();
+	//	restart the countdown now; moving to the Trash can take a while (eg, on
+	//	slow volumes) and the timer would otherwise keep counting down meanwhile
+	if(self.timerRunning) self.timerRunning = YES;
 	[[NSWorkspace sharedWorkspace] recycleURLs:@[URL] completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
 		dispatch_async(dispatch_get_main_queue(), ^{
 			if(error || !newURLs[URL]) return NSBeep();
