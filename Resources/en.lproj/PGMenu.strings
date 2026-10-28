@@ -87,3 +87,13 @@
 "Repeat All" = "Repeat All";
 "Shuffle" = "Shuffle";
 "Repeat Off" = "Repeat Off";
+
+"Transition" = "Transition";
+"None" = "None";
+"Fade" = "Fade";
+"Push" = "Push";
+"Move In" = "Move In";
+"Reveal" = "Reveal";
+"Fast" = "Fast";
+"Normal" = "Normal";
+"Slow" = "Slow";

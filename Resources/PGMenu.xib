@@ -346,6 +346,62 @@ CA
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Transition" id="PTr-mn-itm">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Transition" id="PTr-mn-mnu">
+                                    <items>
+                                        <menuItem title="None" tag="0" id="PTr-00-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTr-00-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Fade" tag="1" id="PTr-01-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTr-01-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Push" tag="2" id="PTr-02-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTr-02-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Move In" tag="3" id="PTr-03-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTr-03-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Reveal" tag="4" id="PTr-04-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTr-04-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PTr-sp-itm"/>
+                                        <menuItem title="Fast" tag="250" id="PTr-05-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionDuration:" target="-1" id="PTr-05-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Normal" tag="500" id="PTr-06-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionDuration:" target="-1" id="PTr-06-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Slow" tag="1000" id="PTr-07-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionDuration:" target="-1" id="PTr-07-act"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem title="Reorient" id="893">
                                 <menu key="submenu" title="Reorient" id="894">
                                     <items>

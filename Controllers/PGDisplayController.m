@@ -189,6 +189,14 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 @property (nonatomic, assign) BeforeState bs;
 @property (nonatomic, assign) NSRect windowFrameForNonFullScreenMode;
 
+@property (nonatomic, strong) NSView *pageTransitionView;	//	2026/10/28 added
+@property (nonatomic, assign) BOOL pageTransitionPending;	//	2026/10/28 added
+@property (nonatomic, assign) BOOL pageTransitionForward;	//	2026/10/28 added
+
+- (NSBitmapImageRep *)_snapshotForPageTransition;	//	2026/10/28 added
+- (void)_runPageTransitionFromSnapshot:(NSBitmapImageRep *)before;	//	2026/10/28 added
+- (void)_endPageTransition;	//	2026/10/28 added
+
 - (void)_setClipViewBackground;
 - (void)_setImageView:(PGImageView *)aView;
 - (BOOL)_setActiveNode:(PGNode *)aNode;
@@ -224,6 +232,41 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 @end
 
 #endif
+
+//	MARK: -
+
+//	2026/10/28 added: a click-through, layer-hosting view which animates
+//	snapshots of the outgoing and incoming pages above the clip view.
+@interface PGPageTransitionView : NSView
+@end
+
+@implementation PGPageTransitionView
+- (NSView *)hitTest:(NSPoint)aPoint
+{
+	return nil;
+}
+@end
+
+static NSBitmapImageRep *PGSnapshotOfView(NSView *view)
+{
+	NSRect const bounds = view.bounds;
+	if(NSIsEmptyRect(bounds)) return nil;
+	NSBitmapImageRep *const rep = [view bitmapImageRepForCachingDisplayInRect:bounds];
+	if(!rep) return nil;
+	[view cacheDisplayInRect:bounds toBitmapImageRep:rep];
+	return rep;
+}
+
+static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id fromValue, id toValue)
+{
+	CABasicAnimation *const animation = [CABasicAnimation animationWithKeyPath:keyPath];
+	animation.fromValue = fromValue;
+	animation.toValue = toValue;
+	animation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+	animation.fillMode = kCAFillModeBoth;
+	animation.removedOnCompletion = NO;
+	[layer addAnimation:animation forKey:keyPath];
+}
 
 //	MARK: -
 
@@ -475,6 +518,14 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 	BOOL const nowPlaying = !self.activeDocument.animatesImages;
 	[_graphicPanel.contentView pushGraphic:[PGBezierPathIconGraphic graphicWithIconType:nowPlaying ? AEPlayIcon : AEPauseIcon] window:self.window];
 	self.activeDocument.animatesImages = nowPlaying;
+}
+- (IBAction)changePageTransitionStyle:(id)sender	//	2026/10/28 added
+{
+	[[NSUserDefaults standardUserDefaults] setInteger:[sender tag] forKey:PGPageTransitionStyleKey];
+}
+- (IBAction)changePageTransitionDuration:(id)sender	//	2026/10/28 added
+{
+	[[NSUserDefaults standardUserDefaults] setInteger:[sender tag] forKey:PGPageTransitionDurationKey];
 }
 - (IBAction)toggleColorInversion:(id)sender	//	2024/08/14 added action for better PDF reading in Dark Mode
 {
@@ -981,6 +1032,8 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 	if(![self _setActiveNode:aNode]) return;
 	if(self.window.currentEvent.modifierFlags & NSEventModifierFlagControl) _initialLocation = PGPreserveLocation;
 	else _initialLocation = flag ? PGHomeLocation : [[[NSUserDefaults standardUserDefaults] objectForKey:PGBackwardsInitialLocationKey] integerValue];
+	_pageTransitionPending = YES;	//	2026/10/28 added
+	_pageTransitionForward = flag;
 	[self _readActiveNode];
 }
 - (BOOL)tryToSetActiveNode:(PGNode *)aNode forward:(BOOL)flag
@@ -1124,6 +1177,7 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 
 - (void)clipViewFrameDidChange:(NSNotification *)aNotif
 {
+	[self _endPageTransition];	//	2026/10/28 added
 	[self _updateImageViewSizeAllowAnimation:NO];
 }
 
@@ -1137,6 +1191,7 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 - (void)nodeReadyForViewing:(NSNotification *)aNotif
 {
 	NSParameterAssert([aNotif object] == [self activeNode]);
+	NSBitmapImageRep *const transitionSnapshot = [self _snapshotForPageTransition];	//	2026/10/28 added
 	NSError *const error = self.activeNode.resourceAdapter.error;
 	if(!error) {
 #if __has_feature(objc_arc)
@@ -1156,6 +1211,7 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 		else
 			[_clipView scrollToLocation:_initialLocation animation:PGNoAnimation];
 		[self.window makeFirstResponder:_clipView];
+		[self _runPageTransitionFromSnapshot:transitionSnapshot];	//	2026/10/28 added
 #else
 		[clipView setDocumentView:_imageView];
 		if(PGPreserveLocation == _initialLocation)
@@ -1381,6 +1437,93 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 		return [PGPreferenceWindowController.sharedPrefController backgroundPatternColor];
 }
 
+- (NSBitmapImageRep *)_snapshotForPageTransition	//	2026/10/28 added
+{
+	BOOL const pending = _pageTransitionPending;
+	_pageTransitionPending = NO;
+	[self _endPageTransition];
+	if(!pending) return nil;
+	NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];
+	if(PGNoPageTransition == [d integerForKey:PGPageTransitionStyleKey] ||
+	   [d integerForKey:PGPageTransitionDurationKey] <= 0) return nil;
+	NSWindow *const window = self.window;
+	if(!window.visible || !(window.occlusionState & NSWindowOcclusionStateVisible)) return nil;
+	//	snapshots are drawn without layer filters, so they would
+	//	flash un-inverted colors while Invert Colors is on
+	if(_imageView.wantsLayer) return nil;
+	return PGSnapshotOfView(_clipView);
+}
+- (void)_runPageTransitionFromSnapshot:(NSBitmapImageRep *)before	//	2026/10/28 added
+{
+	if(!before) return;
+	NSView *const superview = _clipView.superview;
+	NSBitmapImageRep *const after = PGSnapshotOfView(_clipView);
+	if(!superview || !after) return;
+
+	NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];
+	PGPageTransitionStyle const style = [d integerForKey:PGPageTransitionStyleKey];
+	CFTimeInterval const duration = [d integerForKey:PGPageTransitionDurationKey] / 1000.0;
+
+	PGPageTransitionView *const view = [[PGPageTransitionView alloc] initWithFrame:_clipView.frame];
+	CALayer *const root = [CALayer layer];
+	view.layer = root;
+	view.wantsLayer = YES;
+	CGRect const layerFrame = NSRectToCGRect(view.bounds);
+	CGFloat const scale = self.window.backingScaleFactor;
+	CALayer *const oldLayer = [CALayer layer];
+	CALayer *const newLayer = [CALayer layer];
+	oldLayer.frame = newLayer.frame = layerFrame;
+	oldLayer.contentsScale = newLayer.contentsScale = scale;
+	oldLayer.contents = (__bridge id)before.CGImage;
+	newLayer.contents = (__bridge id)after.CGImage;
+	//	the outgoing page slides off the top of the incoming page when revealing
+	if(PGRevealPageTransition == style) {
+		[root addSublayer:newLayer];
+		[root addSublayer:oldLayer];
+	} else {
+		[root addSublayer:oldLayer];
+		[root addSublayer:newLayer];
+	}
+	[superview addSubview:view positioned:NSWindowAbove relativeTo:_clipView];
+	_pageTransitionView = view;
+
+	//	the incoming page enters from the side the reader is moving towards
+	BOOL const leftToRight = PGReadingDirectionLeftToRight == self.activeDocument.readingDirection;
+	CGFloat const distance = NSWidth(view.bounds) * (_pageTransitionForward == leftToRight ? 1.0f : -1.0f);
+	NSString *const translationX = @"transform.translation.x";
+
+	__weak PGDisplayController *const weakSelf = self;
+	__weak NSView *const weakView = view;
+	[CATransaction begin];
+	[CATransaction setAnimationDuration:duration];
+	[CATransaction setCompletionBlock:^{
+		PGDisplayController *const strongSelf = weakSelf;
+		if(strongSelf && strongSelf.pageTransitionView == weakView) [strongSelf _endPageTransition];
+	}];
+	switch(style) {
+		case PGFadePageTransition:
+			PGAddPageTransitionAnimation(newLayer, @"opacity", @0.0f, @1.0f);
+			break;
+		case PGPushPageTransition:
+			PGAddPageTransitionAnimation(oldLayer, translationX, @0.0f, @(-distance));
+			PGAddPageTransitionAnimation(newLayer, translationX, @(distance), @0.0f);
+			break;
+		case PGMoveInPageTransition:
+			PGAddPageTransitionAnimation(newLayer, translationX, @(distance), @0.0f);
+			break;
+		case PGRevealPageTransition:
+			PGAddPageTransitionAnimation(oldLayer, translationX, @0.0f, @(-distance));
+			break;
+		default:
+			break;
+	}
+	[CATransaction commit];
+}
+- (void)_endPageTransition	//	2026/10/28 added
+{
+	[_pageTransitionView removeFromSuperview];
+	_pageTransitionView = nil;
+}
 - (void)_setClipViewBackground {
 	NSColor *const clipViewBackgroundColor = [self
 		_clipViewBackgroundColorWhenFullScreen:self._isInAnyFullScreenMode];
@@ -1883,6 +2026,12 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 		if(!canAnimate) return NO;
 	}
 	if(@selector(toggleColorInversion:) == action) anItem.state = self.imageView.wantsLayer;
+	if(@selector(changePageTransitionStyle:) == action) anItem.state = [[NSUserDefaults standardUserDefaults] integerForKey:PGPageTransitionStyleKey] == tag;
+	if(@selector(changePageTransitionDuration:) == action) {
+		NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];
+		anItem.state = [d integerForKey:PGPageTransitionDurationKey] == tag;
+		if(PGNoPageTransition == [d integerForKey:PGPageTransitionStyleKey]) return NO;
+	}
 
 	// Scale:
 	if(@selector(changeImageScaleMode:) == action) {

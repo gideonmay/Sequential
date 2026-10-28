@@ -785,10 +785,12 @@ PerformMenuItemActionWithMatchingKeyEquivalent(NSEvent *event, NSMenu *menu) {
 				//	[menu update]; <== validates every item in the menu
 					//	validate just the menu item
 					id validator = [NSApp targetForAction:action to:mi.target from:menu];
-					if(validator && [validator respondsToSelector:@selector(validateMenuItem:)])
+					//	2026/10/28 no object in the responder chain can perform the
+					//	action so keep looking instead of aborting (was: abort())
+					if(!validator)
+						continue;
+					if([validator respondsToSelector:@selector(validateMenuItem:)])
 						mi.enabled = [validator validateMenuItem:mi];
-					else
-						abort();
 				}
 //NSLog(@"  executing menu item @ index %lu in menu %@", index, menu.title);
 				[menu performActionForItemAtIndex:index];

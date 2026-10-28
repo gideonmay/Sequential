@@ -118,6 +118,8 @@ extern NSString *const PGDisplayControllerTimerDidChangeNotification;
 - (IBAction)revertOrientation:(id)sender;
 - (IBAction)changeOrientation:(id)sender;
 - (IBAction)toggleAnimation:(id)sender;
+- (IBAction)changePageTransitionStyle:(id)sender;	//	2026/10/28 added
+- (IBAction)changePageTransitionDuration:(id)sender;	//	2026/10/28 added
 
 - (IBAction)changeImageScaleMode:(id)sender;
 - (IBAction)zoomIn:(id)sender;
