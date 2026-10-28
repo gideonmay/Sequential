@@ -31,3 +31,6 @@ build/
 .DS_Store
 .svn
 build/
+
+# Xcode build output
+DerivedData/

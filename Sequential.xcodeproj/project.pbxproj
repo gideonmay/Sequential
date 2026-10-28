@@ -439,7 +439,7 @@
 		0E1D3A4B0A7FA7B500C542A6 /* PGClipView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PGClipView.m; sourceTree = "<group>"; };
 		0E1D3EC70A8091FD00C542A6 /* PGDocumentController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PGDocumentController.h; sourceTree = "<group>"; };
 		0E1D3EC80A8091FE00C542A6 /* PGDocumentController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PGDocumentController.m; sourceTree = "<group>"; };
-		0E20FCC6109652CE007EE24A /* XADMaster.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = XADMaster.xcodeproj; path = ../XADMaster/XADMaster.xcodeproj; sourceTree = "<group>"; };
+		0E20FCC6109652CE007EE24A /* XADMaster.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = XADMaster.xcodeproj; path = Dependencies/XADMaster/XADMaster.xcodeproj; sourceTree = SOURCE_ROOT; };
 		0E20FDB810967449007EE24A /* PGOrientationMenuItemCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PGOrientationMenuItemCell.h; sourceTree = "<group>"; };
 		0E20FDB910967449007EE24A /* PGOrientationMenuItemCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PGOrientationMenuItemCell.m; sourceTree = "<group>"; };
 		0E246B4110887CF200C30936 /* PGFoundationAdditions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PGFoundationAdditions.h; sourceTree = "<group>"; };
@@ -603,7 +603,7 @@
 		F1CA6DBE26BA316900ECE823 /* libbz2.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = usr/lib/libbz2.tbd; sourceTree = SDKROOT; };
 		F1CA6DC526BA31D400ECE823 /* libSystem.B.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libSystem.B.tbd; path = usr/lib/libSystem.B.tbd; sourceTree = SDKROOT; };
 		F1CA6DDA26BA587100ECE823 /* only_for_linking_cpp_dylib.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = only_for_linking_cpp_dylib.cpp; sourceTree = "<group>"; };
-		F1E5351026AD98800057A129 /* UniversalDetector.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = UniversalDetector.xcodeproj; path = ../UniversalDetector/UniversalDetector.xcodeproj; sourceTree = SOURCE_ROOT; };
+		F1E5351026AD98800057A129 /* UniversalDetector.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = UniversalDetector.xcodeproj; path = Dependencies/UniversalDetector/UniversalDetector.xcodeproj; sourceTree = SOURCE_ROOT; };
 		F1E5354A26AE74110057A129 /* PGFadeOutPanel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PGFadeOutPanel.h; sourceTree = "<group>"; };
 		F1E5354F26AE74110057A129 /* PGFadeOutPanel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PGFadeOutPanel.m; sourceTree = "<group>"; };
 		F1E5356826AE74BC0057A129 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
@@ -1636,7 +1636,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_ARC = YES;
-				FRAMEWORK_SEARCH_PATHS = ../;
+				FRAMEWORK_SEARCH_PATHS = Dependencies;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
@@ -1654,7 +1654,7 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_ARC = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				FRAMEWORK_SEARCH_PATHS = ../;
+				FRAMEWORK_SEARCH_PATHS = Dependencies;
 				INFOPLIST_FILE = Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
@@ -1696,7 +1696,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				ONLY_ACTIVE_ARCH = YES;
 				STRIP_INSTALLED_PRODUCT = NO;
-				USER_HEADER_SEARCH_PATHS = ..;
+				USER_HEADER_SEARCH_PATHS = Dependencies;
 			};
 			name = Debug;
 		};
@@ -1725,7 +1725,7 @@
 				GCC_WARN_UNUSED_LABEL = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				USER_HEADER_SEARCH_PATHS = ..;
+				USER_HEADER_SEARCH_PATHS = Dependencies;
 			};
 			name = Release;
 		};

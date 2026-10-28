@@ -29,7 +29,31 @@ macOS 10.14.5 (on an Intel Mac) and macOS 12.7.6 (on an Apple Silicon Mac).
 
 
 
+## About this fork
+
+This fork builds with Xcode 27 against the macOS 27 SDK and requires
+macOS 27 or later. Changes compared to chuchusoft's 2.6.0:
+
+- builds with Xcode 27; compiler warnings (mostly API deprecations) are no
+  longer treated as errors
+- the XADMaster and UniversalDetector dependencies are included in the
+  `Dependencies` folder so the repository builds on its own
+- View > Transition: animated page transitions (Fade, Push, Move In,
+  Reveal) at Fast, Normal or Slow speed, played on every page turn,
+  including the Timer slideshow
+- folder depth: choose how many levels of subfolders are included when
+  viewing a folder, from Top Level Only to All Subfolders, in the
+  File > Open panel, in View > Folder Depth (rescans the open folder) and
+  in Settings > Navigation
+- folders can be chosen in the File > Open panel again
+- fixed a crash when pressing a key whose menu shortcut has no target
+
+
+
+
 ## Source code
+
+This fork is at <https://github.com/gideonmay/Sequential>.
 
 The modernized Sequential source code is at <https://github.com/chuchusoft/Sequential>.
 
@@ -41,12 +65,23 @@ The original Sequential source code is at <https://github.com/btrask/Sequential>
 
 ## Building instructions
 
-- decompress the source archive into a folder
-  - dependencies are included in the source archive
-- open the Sequential folder inside the chosen folder
+Requires Xcode 27 or later. The XADMaster and UniversalDetector
+dependencies are in the `Dependencies` folder and are built automatically
+as part of the Sequential project.
+
+- clone the repository (or decompress the source archive into a folder)
 - open the Sequential.xcodeproj project in Xcode
 - select the Sequential build scheme
 - use the Product -> Build command
+
+To build from the command line and install the app into /Applications:
+
+% cd Sequential
+% xcodebuild -project Sequential.xcodeproj -scheme Sequential -configuration Release -derivedDataPath DerivedData build
+% ditto DerivedData/Build/Products/Release/Sequential.app /Applications/Sequential.app
+
+The app is ad-hoc signed, which is enough to run it on the Mac it was
+built on.
 
 
 
@@ -59,7 +94,7 @@ The original Sequential source code is at <https://github.com/btrask/Sequential>
 - to create the source backup archive:
 
 % cd ~/folder_containing_sequential_sources
-% tar -c -v -J -H -f Sequential.src.2021-08-04.15.27.00.tar.xz --exclude=xcuserdata --exclude=.DS_Store --exclude=.git  --exclude=.gitignore --exclude=.gitattributes --exclude=Sequential/docs --exclude=XADMaster/Windows Sequential XADMaster UniversalDetector
+% tar -c -v -J -H -f Sequential.src.2021-08-04.15.27.00.tar.xz --exclude=xcuserdata --exclude=.DS_Store --exclude=.git  --exclude=.gitignore --exclude=.gitattributes --exclude=Sequential/docs --exclude=Sequential/DerivedData --exclude=Sequential/Dependencies/XADMaster/Windows Sequential
 
 - to distribute the built app:
 
