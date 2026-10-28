@@ -76,6 +76,8 @@ NSString *const PGThumbnailControllerContentInsetDidChangeNotification = @"PGThu
 
 - (void)_updateInfoWindowFrame;	//	2023/10/02
 - (void)_updateWindowFrame;
+- (PGNode *)_firstViewableNodeInNode:(PGNode *)node levels:(NSUInteger)levels;	//	2026/10/28 added
+- (void)_showFirstViewableNodeInNode:(PGNode *)node;	//	2026/10/28 added
 
 @end
 
@@ -554,6 +556,35 @@ NSLog(@"-mouseMoved:");
 	PGNode *const parent = ((PGNode *)item).parentNode;
 	return self.document.node == parent && !parent.isViewable ? nil : parent;
 }
+- (void)_showFirstViewableNodeInNode:(PGNode *)node	//	2026/10/28 added
+{
+	//	the selection may have changed since the click
+	if(![_browser.selection isEqualToSet:[NSSet setWithObject:node]]) return;
+	//	looks inside nested folders and archives, loading them if necessary
+	PGDocumentController *const dc = [PGDocumentController sharedDocumentController];
+	[dc beginLoadingProgressWithName:node.identifier.displayName];
+	PGNode *const firstImage = [self _firstViewableNodeInNode:node levels:0];
+	[dc endLoadingProgress];
+	if(firstImage) (void)[self.displayController tryToSetActiveNode:firstImage forward:YES];
+}
+- (PGNode *)_firstViewableNodeInNode:(PGNode *)node levels:(NSUInteger)levels	//	2026/10/28 added
+{
+	//	depth-first search in the current sort order; folders and archives
+	//	beyond the folder depth weren't loaded and are loaded on demand
+	if(node.isViewable) return node;
+	if(!node.resourceAdapter.isContainer || levels > PGMaxDepthAll ||
+	   [PGDocumentController sharedDocumentController].loadingProgressStopped) return nil;
+	if(!((PGContainerAdapter *)node.resourceAdapter).sortedChildren) {
+		[PGResourceAdapter reloadNodeIgnoringMaxDepth:node];
+		if(node.isViewable) return node;
+		if(!node.resourceAdapter.isContainer) return nil;
+	}
+	for(PGNode *const child in ((PGContainerAdapter *)node.resourceAdapter).sortedChildren) {
+		PGNode *const firstImage = [self _firstViewableNodeInNode:child levels:levels + 1];
+		if(firstImage) return firstImage;
+	}
+	return nil;
+}
 - (BOOL)thumbnailBrowser:(PGThumbnailBrowser *)sender itemCanHaveChildren:(id)item
 {
 	return [item resourceAdapter].isContainer;
@@ -568,6 +599,15 @@ NSLog(@"-mouseMoved:");
 	NSUInteger const count = selection.count;
 	(void)[self.displayController tryToSetActiveNode:(count == 1 ? item : ((PGNode *)item).parentNode).viewableAncestor
 											 forward:YES];
+	//	2026/10/28 clicking a folder or archive shows its first image; this is
+	//	deferred because loading a folder or archive changes the browser's
+	//	items, which must not happen while it is handling a selection change
+	if(1 == count && item.resourceAdapter.isContainer) {
+		__weak PGThumbnailController *const weakSelf = self;
+		dispatch_async(dispatch_get_main_queue(), ^{
+			[weakSelf _showFirstViewableNodeInNode:item];
+		});
+	}
 
 	//	2023/10/02 when > 1 node is selected, show and update the Info window
 	//	otherwise hide it

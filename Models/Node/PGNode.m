@@ -273,7 +273,9 @@ enum {
 {
 	NSParameterAssert((PGNodeLoadingOrReading & _status) == PGNodeReading);
 	_status &= ~PGNodeReading;
-	[self PG_postNotificationName:PGNodeReadyForViewingNotification userInfo:@{PGImageRepKey: aRep}];
+	//	2026/10/28 bugfix: aRep is nil for nodes without an image (eg, a folder);
+	//	the original -dictionaryWithObjectsAndKeys: returned an empty dictionary
+	[self PG_postNotificationName:PGNodeReadyForViewingNotification userInfo:aRep ? @{PGImageRepKey: aRep} : @{}];
 }
 
 //	MARK: -

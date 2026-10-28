@@ -150,8 +150,18 @@ static NSString *const PGCFBundleTypeExtensionsKey = @"CFBundleTypeExtensions";
 	PGContainerAdapter *const p = self.parentAdapter;
 	return p ? p.descendantRecursionPolicy : PGRecurseToMaxDepth;
 }
+static PGNode *PGNodeReloadingIgnoringMaxDepth = nil;	//	2026/10/28 added
+
++ (void)reloadNodeIgnoringMaxDepth:(PGNode *)node	//	2026/10/28 added
+{
+	PGNode *const previous = PGNodeReloadingIgnoringMaxDepth;
+	PGNodeReloadingIgnoringMaxDepth = node;
+	[node reload];
+	PGNodeReloadingIgnoringMaxDepth = previous;
+}
 - (BOOL)shouldRecursivelyCreateChildren
 {
+	if(PGNodeReloadingIgnoringMaxDepth && self.node == PGNodeReloadingIgnoringMaxDepth) return YES;	//	2026/10/28 added
 	switch(self.recursionPolicy) {
 		case PGRecurseToMaxDepth: return self.depth <= [[[NSUserDefaults standardUserDefaults] objectForKey:PGMaxDepthKey] unsignedIntegerValue] + 1;
 		case PGRecurseToAnyDepth: return YES;

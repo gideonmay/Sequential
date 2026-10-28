@@ -59,6 +59,9 @@ typedef NS_ENUM(NSInteger, PGRecursionPolicy) {
 + (NSDictionary *)typesDictionary;
 + (NSArray *)supportedFileTypes;
 + (NSArray *)supportedMIMETypes;
+//	2026/10/28 added: loads a folder or archive which wasn't loaded because it
+//	is beyond the folder depth (its children are still subject to the depth)
++ (void)reloadNodeIgnoringMaxDepth:(PGNode *)node;
 
 - (instancetype)initWithNode:(PGNode *)node dataProvider:(PGDataProvider *)dataProvider NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;

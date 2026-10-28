@@ -106,7 +106,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 	if(1 == aSet.count) {
 		obj = [aSet anyObject];
 		if([self.dataSource thumbnailBrowser:self itemCanHaveChildren:obj]) {
-			[path insertObject:obj atIndex:0];
+			//	2026/10/28 bugfix: was inserted at index 0, which made the first
+			//	column select a nested container it doesn't contain
+			[path addObject:obj];
 			singleContainerIsSelected = YES;
 		}
 	}
