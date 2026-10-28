@@ -204,6 +204,9 @@ typedef NS_ENUM(NSUInteger, PGImageScaleConstraint) {
 - (id)openDocumentWithBookmark:(PGBookmark *)aBookmark display:(BOOL)flag;
 - (void)reopenFolderDocument:(PGDocument *)document atNode:(PGNode *)node;	//	2026/10/28 added
 
+//	2026/10/28 added: the "Open in Sequential" service (see NSServices in Info.plist)
+- (void)openInSequential:(NSPasteboard *)pboard userData:(NSString *)userData error:(NSString * __autoreleasing *)error;
+
 //	2026/10/28 added: loading progress; folders and archives are loaded on the
 //	main thread so a progress panel is shown (as a modal session, which keeps
 //	the app responsive) when loading takes a while; calls may be nested

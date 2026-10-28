@@ -1316,12 +1316,29 @@ HandlePostEnterFullScreen(PGFloatingPanelController *panel, BeforeState state) {
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotif	//	2026/10/28 added
 {
+	NSApp.servicesProvider = self;	//	2026/10/28 for the "Open in Sequential" service
+	NSUpdateDynamicServices();
+
 	//	show the Open panel when launched without any documents; documents
 	//	opened from the Finder are delivered before this notification, and
 	//	the delay lets any pending open requests arrive first; not dispatched
 	//	to the main queue because a document opened from the panel would then
-	//	load inside a main queue block, which blocks other main queue blocks
+	//	load inside a main queue block, which blocks other main queue blocks;
+	//	not shown when launched to open documents or to provide a service
+	NSNumber *const isDefaultLaunch = aNotif.userInfo[NSApplicationLaunchIsDefaultLaunchKey];
+	if(isDefaultLaunch && !isDefaultLaunch.boolValue) return;
 	[self performSelector:@selector(_openIfNoDocuments) withObject:nil afterDelay:0.0];
+}
+- (void)openInSequential:(NSPasteboard *)pboard userData:(NSString *)userData error:(NSString * __autoreleasing *)error	//	2026/10/28 added
+{
+	NSArray<NSURL *> *const URLs = [pboard readObjectsForClasses:@[[NSURL class]]
+														 options:@{NSPasteboardURLReadingFileURLsOnlyKey: @YES}];
+	if(!URLs.count) {
+		if(error) *error = NSLocalizedString(@"No folder or file was given to open.", @"Error message of the Open in Sequential service.");
+		return;
+	}
+	[NSApp activateIgnoringOtherApps:YES];
+	for(NSURL *const URL in URLs) [self openDocumentWithContentsOfURL:URL display:YES];
 }
 - (void)_openIfNoDocuments	//	2026/10/28 added
 {
