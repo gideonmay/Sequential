@@ -1323,13 +1323,14 @@ HandlePostEnterFullScreen(PGFloatingPanelController *panel, BeforeState state) {
 
 	//	show the Open panel when launched without any documents; documents
 	//	opened from the Finder are delivered before this notification, and
-	//	the delay lets any pending open requests arrive first; not dispatched
-	//	to the main queue because a document opened from the panel would then
-	//	load inside a main queue block, which blocks other main queue blocks;
-	//	not shown when launched to open documents or to provide a service
-	NSNumber *const isDefaultLaunch = aNotif.userInfo[NSApplicationLaunchIsDefaultLaunchKey];
-	if(isDefaultLaunch && !isDefaultLaunch.boolValue) return;
-	[self performSelector:@selector(_openIfNoDocuments) withObject:nil afterDelay:0.0];
+	//	the delay lets requests which arrive just after launching (eg, the
+	//	"Open in Sequential" service, which cancels it) arrive first; not
+	//	dispatched to the main queue because a document opened from the panel
+	//	would then load inside a main queue block, which blocks other main
+	//	queue blocks; NSApplicationLaunchIsDefaultLaunchKey can't be used to
+	//	detect a launch for a service: it's also NO when the system has saved
+	//	window state (ie, "Close windows when quitting an application" is off)
+	[self performSelector:@selector(_openIfNoDocuments) withObject:nil afterDelay:0.5];
 }
 - (void)openInSequential:(NSPasteboard *)pboard userData:(NSString *)userData error:(NSString * __autoreleasing *)error	//	2026/10/28 added
 {
@@ -1339,6 +1340,7 @@ HandlePostEnterFullScreen(PGFloatingPanelController *panel, BeforeState state) {
 		if(error) *error = NSLocalizedString(@"No folder or file was given to open.", @"Error message of the Open in Sequential service.");
 		return;
 	}
+	[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(_openIfNoDocuments) object:nil];	//	2026/10/28
 	[NSApp activateIgnoringOtherApps:YES];
 	for(NSURL *const URL in URLs) [self openDocumentWithContentsOfURL:URL display:YES];
 }
