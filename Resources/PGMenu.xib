@@ -380,6 +380,112 @@ CA
                                                 <action selector="changePageTransitionStyle:" target="-1" id="PTr-04-act"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PTx-s0-itm"/>
+                                        <menuItem title="Zoom" tag="5" id="PTx-00-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-00-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Fade Through Black" tag="6" id="PTx-01-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-01-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Cube" tag="7" id="PTx-02-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-02-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Flip" tag="8" id="PTx-03-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-03-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Spin" tag="9" id="PTx-04-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-04-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PTx-s1-itm"/>
+                                        <menuItem title="Iris" tag="10" id="PTx-05-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-05-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Wipe" tag="11" id="PTx-06-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-06-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Blinds" tag="12" id="PTx-07-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-07-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Mosaic" tag="20" id="PTy-mo-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTy-mo-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PTx-s2-itm"/>
+                                        <menuItem title="Page Curl" tag="13" id="PTx-08-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-08-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Ripple" tag="14" id="PTx-09-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-09-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Copy Machine" tag="15" id="PTx-10-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-10-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Bars" tag="16" id="PTx-11-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-11-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Mod" tag="17" id="PTx-12-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-12-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Flash" tag="18" id="PTx-13-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-13-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Swirl" tag="19" id="PTy-sw-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTy-sw-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PTx-s3-itm"/>
+                                        <menuItem title="Random" tag="99" id="PTx-14-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changePageTransitionStyle:" target="-1" id="PTx-14-act"/>
+                                            </connections>
+                                        </menuItem>
                                         <menuItem isSeparatorItem="YES" id="PTr-sp-itm"/>
                                         <menuItem title="Fast" tag="250" id="PTr-05-itm">
                                             <modifierMask key="keyEquivalentModifierMask"/>

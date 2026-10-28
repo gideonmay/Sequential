@@ -90,6 +90,25 @@ typedef NS_ENUM(NSInteger, PGPageTransitionStyle) {	//	2026/10/28 added
 	PGPushPageTransition = 2,
 	PGMoveInPageTransition = 3,
 	PGRevealPageTransition = 4,
+	//	2026/10/28 added
+	PGZoomPageTransition = 5,
+	PGFadeThroughBlackPageTransition = 6,
+	PGCubePageTransition = 7,
+	PGFlipPageTransition = 8,
+	PGSpinPageTransition = 9,
+	PGIrisPageTransition = 10,
+	PGWipePageTransition = 11,
+	PGBlindsPageTransition = 12,
+	PGPageCurlPageTransition = 13,	//	Core Image transition filters from here on
+	PGRipplePageTransition = 14,
+	PGCopyMachinePageTransition = 15,
+	PGBarsPageTransition = 16,
+	PGModPageTransition = 17,
+	PGFlashPageTransition = 18,
+	PGSwirlPageTransition = 19,
+	PGMosaicPageTransition = 20,	//	Core Animation again
+	PGLastPageTransition = PGMosaicPageTransition,
+	PGRandomPageTransition = 99,	//	a different one for every page turn
 };
 typedef NS_ENUM(NSUInteger, PGImageScaleConstraint) {
 	PGScaleFreely = 0,
