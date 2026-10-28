@@ -172,6 +172,12 @@ static inline NSPoint PGPointInRect(NSPoint aPoint, NSRect aRect)
 		while(i--) [self setNeedsDisplayInRect:rects[i]];
 	} else [self setNeedsDisplay:YES];
 }
+- (void)setAmbientImage:(NSImage *)image	//	2026/10/28 added
+{
+	if(image == _ambientImage) return;
+	_ambientImage = image;
+	[self setNeedsDisplay:YES];
+}
 - (void)setCursor:(NSCursor *)cursor
 {
 	if(cursor == _cursor) return;
@@ -546,7 +552,7 @@ static inline NSPoint PGPointInRect(NSPoint aPoint, NSRect aRect)
 	self.scrolling = YES;
 	_position = newPosition;
 	[self setBoundsOrigin:NSMakePoint(round(_position.x), round(_position.y))];
-	if(redisplay) [self setNeedsDisplay:YES];
+	if(redisplay || _ambientImage) [self setNeedsDisplay:YES];	//	2026/10/28 the ambient image stays put
 	self.scrolling = NO;
 	[self PG_postNotificationName:PGClipViewBoundsDidChangeNotification];
 	return YES;
@@ -602,7 +608,7 @@ static inline NSPoint PGPointInRect(NSPoint aPoint, NSRect aRect)
 
 - (BOOL)isOpaque
 {
-	return !!_backgroundColor;
+	return !!_backgroundColor || !!_ambientImage;
 }
 - (BOOL)isFlipped
 {
@@ -614,6 +620,22 @@ static inline NSPoint PGPointInRect(NSPoint aPoint, NSRect aRect)
 }
 - (void)drawRect:(NSRect)aRect
 {
+	if(_ambientImage) {	//	2026/10/28 added: fill the view, keeping the image's aspect ratio
+		NSRect const b = self.bounds;
+		NSSize const s = _ambientImage.size;
+		if(s.width > 0 && s.height > 0) {
+			CGFloat const scale = MAX(NSWidth(b) / s.width, NSHeight(b) / s.height);
+			NSSize const fill = NSMakeSize(s.width * scale, s.height * scale);
+			[NSGraphicsContext currentContext].imageInterpolation = NSImageInterpolationHigh;
+			[_ambientImage drawInRect:NSMakeRect(NSMidX(b) - fill.width / 2.0f, NSMidY(b) - fill.height / 2.0f, fill.width, fill.height)
+							 fromRect:NSZeroRect
+							operation:NSCompositingOperationCopy
+							 fraction:1.0f
+					   respectFlipped:YES
+								hints:nil];
+			return;
+		}
+	}
 	if(!_backgroundColor) return;
 	CGContextSetPatternPhase([NSGraphicsContext currentContext].CGContext, CGSizeMake(0, NSHeight(self.bounds)));
 	[_backgroundColor set];

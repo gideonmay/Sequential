@@ -98,6 +98,7 @@ typedef NS_ENUM(NSUInteger, PGScrollToRectType) {
 @property (nonatomic, assign) PGInset boundsInset;
 @property (readonly) NSRect insetBounds;
 @property (nonatomic, strong) NSColor *backgroundColor;
+@property (nonatomic, strong) NSImage *ambientImage;	//	2026/10/28 added: drawn instead of the background color, filling the view
 @property (nonatomic, assign) BOOL showsBorder;
 @property (nonatomic, strong) NSCursor *cursor;
 @property (nonatomic, assign, getter = isScrolling) BOOL scrolling;

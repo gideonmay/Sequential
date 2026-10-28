@@ -197,6 +197,7 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 - (NSBitmapImageRep *)_snapshotForPageTransition;	//	2026/10/28 added
 - (void)_runPageTransitionFromSnapshot:(NSBitmapImageRep *)before;	//	2026/10/28 added
 - (void)_endPageTransition;	//	2026/10/28 added
+- (void)_updateAmbientBackground;	//	2026/10/28 added
 
 - (void)_setClipViewBackground;
 - (void)_setImageView:(PGImageView *)aView;
@@ -256,6 +257,46 @@ static NSBitmapImageRep *PGSnapshotOfView(NSView *view)
 	if(!rep) return nil;
 	[view cacheDisplayInRect:bounds toBitmapImageRep:rep];
 	return rep;
+}
+
+//	2026/10/28 added: a small, blurred and slightly darkened copy of the image
+//	which fills the area around it, like an ambient light
+static NSImage *PGAmbientImageOf(NSImageRep *rep, PGOrientation orientation)
+{
+	NSSize size = NSMakeSize(rep.pixelsWide > 0 ? rep.pixelsWide : rep.size.width,
+							 rep.pixelsHigh > 0 ? rep.pixelsHigh : rep.size.height);
+	if(size.width < 1.0f || size.height < 1.0f) return nil;
+	if(PGRotated90CCW & orientation) size = NSMakeSize(size.height, size.width);
+	CGFloat const scale = 48.0f / MAX(size.width, size.height);
+	NSInteger const w = MAX(1, lround(size.width * scale)), h = MAX(1, lround(size.height * scale));
+	NSBitmapImageRep *const small = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
+		pixelsWide:w pixelsHigh:h bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
+		colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
+	if(!small) return nil;
+	[NSGraphicsContext saveGraphicsState];
+	NSGraphicsContext *const context = [NSGraphicsContext graphicsContextWithBitmapImageRep:small];
+	[NSGraphicsContext setCurrentContext:context];
+	context.imageInterpolation = NSImageInterpolationHigh;
+	NSRect rect = NSMakeRect(0.0f, 0.0f, w, h);
+	[[NSColor blackColor] set];
+	NSRectFill(rect);
+	if(PGUpright != orientation) [[NSAffineTransform PG_transformWithRect:&rect orientation:orientation] concat];
+	[rep drawInRect:rect];
+	[NSGraphicsContext restoreGraphicsState];
+
+	static CIContext *ciContext = nil;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{ ciContext = [CIContext contextWithOptions:nil]; });
+	CIImage *image = [[CIImage alloc] initWithBitmapImageRep:small];
+	CGRect const extent = image.extent;
+	image = [image.imageByClampingToExtent imageByApplyingGaussianBlurWithSigma:2.5];
+	image = [image imageByApplyingFilter:@"CIColorControls" withInputParameters:@{kCIInputSaturationKey: @1.3}];
+	image = [[image imageByApplyingFilter:@"CIExposureAdjust" withInputParameters:@{kCIInputEVKey: @-0.7}] imageByCroppingToRect:extent];
+	CGImageRef const cgImage = [ciContext createCGImage:image fromRect:extent];
+	if(!cgImage) return nil;
+	NSImage *const result = [[NSImage alloc] initWithCGImage:cgImage size:NSMakeSize(w, h)];
+	CGImageRelease(cgImage);
+	return result;
 }
 
 static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id fromValue, id toValue)
@@ -535,6 +576,12 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	if(self.activeDocument.folderMaxDepth != depth)
 		[[PGDocumentController sharedDocumentController] reopenFolderDocument:self.activeDocument atNode:self.activeNode];
 }
+- (IBAction)changeBackgroundStyle:(id)sender	//	2026/10/28 added
+{
+	[[NSUserDefaults standardUserDefaults] setInteger:[sender tag] forKey:PGBackgroundStyleKey];
+	//	updates every window, as when the background color is changed in the preferences
+	[[PGPreferenceWindowController sharedPrefController] PG_postNotificationName:PGPreferenceWindowControllerBackgroundPatternColorDidChangeNotification];
+}
 - (IBAction)toggleColorInversion:(id)sender	//	2024/08/14 added action for better PDF reading in Dark Mode
 {
 	PGImageView *iv = self.imageView;
@@ -555,6 +602,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	NSLog(@"self.imageView.layer = %@, self.imageView.layer.filters = %@",
 			iv.layer, iv.layer.filters);
 #endif
+	[self _updateAmbientBackground];	//	2026/10/28 added
 }
 
 //	MARK: -
@@ -998,6 +1046,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 			[view setImageRep:view.rep
 				  orientation:view.orientation
 						 size:[self _sizeForImageRep:view.rep orientation:view.orientation]];
+			[self _updateAmbientBackground];	//	2026/10/28 added
 #if __has_feature(objc_arc)
 			[_clipView scrollPinLocationToOffset:offset animation:PGNoAnimation];
 #else
@@ -1219,6 +1268,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 		else
 			[_clipView scrollToLocation:_initialLocation animation:PGNoAnimation];
 		[self.window makeFirstResponder:_clipView];
+		[self _updateAmbientBackground];	//	2026/10/28 added
 		[self _runPageTransitionFromSnapshot:transitionSnapshot];	//	2026/10/28 added
 #else
 		[clipView setDocumentView:_imageView];
@@ -1265,6 +1315,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 			break;
 	}
 	if(!_imageView.superview) [_imageView setImageRep:nil orientation:PGUpright size:NSZeroSize];
+	if(_clipView.documentView != _imageView) _clipView.ambientImage = nil;	//	2026/10/28 eg, an error
 	[self _readFinished];
 	[_thumbnailController clipViewBoundsDidChange:nil];
 }
@@ -1310,6 +1361,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 {
 	PGOrientation const o = [self.activeNode.resourceAdapter orientationWithBase:YES];
 	[_imageView setImageRep:_imageView.rep orientation:o size:[self _sizeForImageRep:_imageView.rep orientation:o]];
+	[self _updateAmbientBackground];	//	2026/10/28 added
 }
 
 //	MARK: -
@@ -1413,6 +1465,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 - (void)prefControllerBackgroundPatternColorDidChange:(NSNotification *)aNotif;
 {
 	[self _setClipViewBackground];
+	[self _updateAmbientBackground];	//	2026/10/28 added
 }
 
 - (void)prefControllerBackgroundColorUsedInFullScreenDidChange:(NSNotification *)aNotif;
@@ -1439,6 +1492,8 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	//	2023/08/14 added this method to enable the background color to depend on
 	//	whether the view's window is in fullscreen mode and whether user wants it
 	//	used in fullscreen mode.
+	if(PGBlackBackground == [[NSUserDefaults standardUserDefaults] integerForKey:PGBackgroundStyleKey])
+		return NSColor.blackColor;	//	2026/10/28 added
 	if(fullscreen && ![self _usePreferredBackgroundColorWhenFullScreen])
 		return NSColor.blackColor;
 	else
@@ -1526,6 +1581,14 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 			break;
 	}
 	[CATransaction commit];
+}
+- (void)_updateAmbientBackground	//	2026/10/28 added
+{
+	//	not while colors are inverted: the image is inverted by a layer filter
+	//	which the ambient background wouldn't get
+	BOOL const show = PGAmbientBackground == [[NSUserDefaults standardUserDefaults] integerForKey:PGBackgroundStyleKey] &&
+		_clipView.documentView == _imageView && _imageView.rep && !_imageView.wantsLayer;
+	_clipView.ambientImage = show ? PGAmbientImageOf(_imageView.rep, _imageView.orientation) : nil;
 }
 - (void)_endPageTransition	//	2026/10/28 added
 {
@@ -2034,6 +2097,7 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 		if(!canAnimate) return NO;
 	}
 	if(@selector(toggleColorInversion:) == action) anItem.state = self.imageView.wantsLayer;
+	if(@selector(changeBackgroundStyle:) == action) anItem.state = [[NSUserDefaults standardUserDefaults] integerForKey:PGBackgroundStyleKey] == tag;
 	if(@selector(changeFolderDepth:) == action) {
 		//	archives, PDFs, etc. always load their entire contents
 		if(![self.activeDocument.node.resourceAdapter isKindOfClass:[PGFolderAdapter class]]) return NO;

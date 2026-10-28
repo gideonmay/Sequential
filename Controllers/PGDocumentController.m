@@ -71,6 +71,7 @@ NSString *const PGDimOtherScreensKey = @"PGDimOtherScreens";
 NSString *const PGImageScaleConstraintKey = @"PGImageScaleConstraint";
 NSString *const PGPageTransitionStyleKey = @"PGPageTransitionStyle";	//	2026/10/28 added
 NSString *const PGPageTransitionDurationKey = @"PGPageTransitionDuration";	//	2026/10/28 added
+NSString *const PGBackgroundStyleKey = @"PGBackgroundStyle";	//	2026/10/28 added
 
 //	thumbnail prefs pane
 NSString *const PGShowThumbnailImageNameKey = @"PGShowThumbnailImageName";	//	2023/10/01 added
@@ -220,6 +221,7 @@ static PGDocumentController *PGSharedDocumentController = nil;
 		PGImageScaleConstraintKey: @(PGScaleFreely),
 		PGPageTransitionStyleKey: @(PGNoPageTransition),
 		PGPageTransitionDurationKey: @500,
+		PGBackgroundStyleKey: @(PGAmbientBackground),
 
 		PGShowThumbnailImageNameKey: @NO,
 		PGShowThumbnailImageSizeKey: @NO,

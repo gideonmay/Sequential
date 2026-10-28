@@ -52,6 +52,7 @@ extern NSString *const PGDimOtherScreensKey;
 
 extern NSString *const PGPageTransitionStyleKey;	//	2026/10/28 added
 extern NSString *const PGPageTransitionDurationKey;	//	2026/10/28 added (milliseconds)
+extern NSString *const PGBackgroundStyleKey;	//	2026/10/28 added (PGBackgroundStyle)
 
 //	thumbnail prefs pane
 extern NSString *const PGShowThumbnailImageNameKey;	//	2023/10/01 added
@@ -77,6 +78,11 @@ enum {
 enum {
 	PGFullscreenMapping = 0,
 	PGQuitMapping       = 1
+};
+typedef NS_ENUM(NSInteger, PGBackgroundStyle) {	//	2026/10/28 added
+	PGSettingsColorBackground = 0,	//	the background color/pattern from the preferences
+	PGBlackBackground = 1,
+	PGAmbientBackground = 2,	//	a blurred copy of the image
 };
 typedef NS_ENUM(NSInteger, PGPageTransitionStyle) {	//	2026/10/28 added
 	PGNoPageTransition = 0,

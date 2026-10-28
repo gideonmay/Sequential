@@ -542,6 +542,31 @@ CA
                                     <action selector="toggleColorInversion:" target="-1" id="nxg-uy-2g4"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Background" id="PBg-mn-itm">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Background" id="PBg-mn-mnu">
+                                    <items>
+                                        <menuItem title="Ambient" tag="2" id="PBg-00-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeBackgroundStyle:" target="-1" id="PBg-00-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Black" tag="1" id="PBg-01-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeBackgroundStyle:" target="-1" id="PBg-01-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Settings Color" tag="0" id="PBg-02-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeBackgroundStyle:" target="-1" id="PBg-02-act"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                         </items>
                     </menu>
                 </menuItem>
