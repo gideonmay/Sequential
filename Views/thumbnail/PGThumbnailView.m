@@ -1656,8 +1656,15 @@ NSLog(@"view %p [%@], has window: %p [%@] \"%@\", is key %c, is 1st responder %c
 {
 	CGContextRef const context = [NSGraphicsContext currentContext].CGContext;
 
-	NSRect const patternRect = [self convertRect:self.bounds toView:nil];
-	CGContextSetPatternPhase(context, CGSizeMake(NSMinX(patternRect), floor(NSMaxY(patternRect) - PGBackgroundHoleHeight / 2.0f)));
+	//	2026/10/28 views now draw into their own layers, so the pattern phase
+	//	(which is in the context's base space) is derived from the context
+	//	instead of the window; using window coordinates misaligned the film
+	//	strip's holes after the browser scrolled sideways
+	CGFloat const scale = self.window.backingScaleFactor ? self.window.backingScaleFactor : 1.0f;
+	CGPoint const patternOrigin = CGContextConvertPointToDeviceSpace(context,
+		CGPointMake(NSMinX(self.bounds), NSMinY(self.bounds)));
+	CGContextSetPatternPhase(context, CGSizeMake(round(patternOrigin.x / scale),
+		floor(patternOrigin.y / scale - PGBackgroundHoleHeight / 2.0f)));
 
 	NSInteger count = 0;
 	NSRect const *rects = NULL;
