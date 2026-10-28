@@ -30,6 +30,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 extern NSString *const PGMaxDepthKey;
 
+//	2026/10/28 added: the PGMaxDepthKey value used for "All Subfolders"; it is
+//	a large finite depth so that symbolic link cycles cannot recurse forever
+enum {
+	PGMaxDepthAll = 99,
+};
+
 @interface PGContainerAdapter : PGResourceAdapter
 #if !__has_feature(objc_arc)
 {

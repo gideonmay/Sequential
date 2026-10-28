@@ -120,6 +120,7 @@ extern NSString *const PGDisplayControllerTimerDidChangeNotification;
 - (IBAction)toggleAnimation:(id)sender;
 - (IBAction)changePageTransitionStyle:(id)sender;	//	2026/10/28 added
 - (IBAction)changePageTransitionDuration:(id)sender;	//	2026/10/28 added
+- (IBAction)changeFolderDepth:(id)sender;	//	2026/10/28 added
 
 - (IBAction)changeImageScaleMode:(id)sender;
 - (IBAction)zoomIn:(id)sender;

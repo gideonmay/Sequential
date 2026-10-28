@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGDocument.h"
 #import "PGNode.h"
 #import "PGContainerAdapter.h"
+#import "PGFolderAdapter.h"
 #import "PGGenericImageAdapter.h"
 #import "PGResourceIdentifier.h"
 #import "PGBookmark.h"
@@ -526,6 +527,13 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 - (IBAction)changePageTransitionDuration:(id)sender	//	2026/10/28 added
 {
 	[[NSUserDefaults standardUserDefaults] setInteger:[sender tag] forKey:PGPageTransitionDurationKey];
+}
+- (IBAction)changeFolderDepth:(id)sender	//	2026/10/28 added
+{
+	NSInteger const depth = [sender tag];
+	[[NSUserDefaults standardUserDefaults] setInteger:depth forKey:PGMaxDepthKey];
+	if(self.activeDocument.folderMaxDepth != depth)
+		[[PGDocumentController sharedDocumentController] reopenFolderDocument:self.activeDocument atNode:self.activeNode];
 }
 - (IBAction)toggleColorInversion:(id)sender	//	2024/08/14 added action for better PDF reading in Dark Mode
 {
@@ -2026,6 +2034,12 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 		if(!canAnimate) return NO;
 	}
 	if(@selector(toggleColorInversion:) == action) anItem.state = self.imageView.wantsLayer;
+	if(@selector(changeFolderDepth:) == action) {
+		//	archives, PDFs, etc. always load their entire contents
+		if(![self.activeDocument.node.resourceAdapter isKindOfClass:[PGFolderAdapter class]]) return NO;
+		NSInteger const depth = self.activeDocument.folderMaxDepth;
+		anItem.state = PGMaxDepthAll == tag ? depth >= PGMaxDepthAll : depth == tag;
+	}
 	if(@selector(changePageTransitionStyle:) == action) anItem.state = [[NSUserDefaults standardUserDefaults] integerForKey:PGPageTransitionStyleKey] == tag;
 	if(@selector(changePageTransitionDuration:) == action) {
 		NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];

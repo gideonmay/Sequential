@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 @class PGDocument;
 @class PGResourceIdentifier;
 @class PGBookmark;
+@class PGNode;	//	2026/10/28 added
 
 // Controllers
 @class PGDisplayController;
@@ -201,6 +202,7 @@ typedef NS_ENUM(NSUInteger, PGImageScaleConstraint) {
 - (id)openDocumentWithContentsOfIdentifier:(PGResourceIdentifier *)ident display:(BOOL)flag;
 - (id)openDocumentWithContentsOfURL:(NSURL *)URL display:(BOOL)flag;
 - (id)openDocumentWithBookmark:(PGBookmark *)aBookmark display:(BOOL)flag;
+- (void)reopenFolderDocument:(PGDocument *)document atNode:(PGNode *)node;	//	2026/10/28 added
 - (void)noteNewRecentDocument:(PGDocument *)document;
 - (void)noteDeletedRecentDocument:(PGDocument *)document;
 

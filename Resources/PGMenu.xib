@@ -402,6 +402,87 @@ CA
                                     </items>
                                 </menu>
                             </menuItem>
+                            <menuItem title="Folder Depth" id="PFd-mn-itm">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Folder Depth" id="PFd-mn-mnu">
+                                    <items>
+                                        <menuItem title="Top Level Only" tag="0" id="PFd-00-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-00-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PFd-s1-itm"/>
+                                        <menuItem title="1 Level of Subfolders" tag="1" id="PFd-01-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-01-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="2 Levels of Subfolders" tag="2" id="PFd-02-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-02-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="3 Levels of Subfolders" tag="3" id="PFd-03-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-03-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="4 Levels of Subfolders" tag="4" id="PFd-04-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-04-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="5 Levels of Subfolders" tag="5" id="PFd-05-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-05-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="6 Levels of Subfolders" tag="6" id="PFd-06-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-06-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="7 Levels of Subfolders" tag="7" id="PFd-07-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-07-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="8 Levels of Subfolders" tag="8" id="PFd-08-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-08-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="9 Levels of Subfolders" tag="9" id="PFd-09-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-09-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="10 Levels of Subfolders" tag="10" id="PFd-10-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-10-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PFd-s2-itm"/>
+                                        <menuItem title="All Subfolders" tag="99" id="PFd-11-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="changeFolderDepth:" target="-1" id="PFd-11-act"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem title="Reorient" id="893">
                                 <menu key="submenu" title="Reorient" id="894">
                                     <items>

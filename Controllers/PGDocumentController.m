@@ -23,6 +23,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGDocumentController.h"
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <sys/resource.h>
 #import <objc/Protocol.h>
 #import <tgmath.h>
@@ -31,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGDocument.h"
 #import "PGResourceAdapter.h"
 #import "PGContainerAdapter.h"
+#import "PGFolderAdapter.h"
 #import "PGResourceIdentifier.h"
 #import "PGBookmark.h"
 
@@ -132,6 +134,8 @@ static PGDocumentController *PGSharedDocumentController = nil;
 - (PGDocument *)_openNew:(BOOL)flag document:(PGDocument *)document display:(BOOL)display;
 - (void)_setRecentDocumentIdentifiers:(NSArray<PGDisplayableIdentifier*> *)anArray;
 - (void)_changeRecentDocumentIdentifiersWithDocument:(PGDocument *)document prepend:(BOOL)prepend;
+- (NSPopUpButton *)_folderDepthPopUpButton;	//	2026/10/28 added
+- (NSView *)_openPanelAccessoryViewWithFolderDepthPopUp:(NSPopUpButton *)popUp;	//	2026/10/28 added
 
 @end
 
@@ -244,11 +248,22 @@ static PGDocumentController *PGSharedDocumentController = nil;
 	[openPanel setCanChooseDirectories:YES];
 	[openPanel setCanChooseFiles:YES];
 	[openPanel setAllowsMultipleSelection:YES];
+	NSPopUpButton *const depthPopUp = [self _folderDepthPopUpButton];	//	2026/10/28 added
+	openPanel.accessoryView = [self _openPanelAccessoryViewWithFolderDepthPopUp:depthPopUp];
+	openPanel.accessoryViewDisclosed = YES;
 	NSURL *const URL = self.currentDocument.rootIdentifier.URL;
 #if 1
 	if(URL.isFileURL)
 		openPanel.directoryURL		=	URL.URLByDeletingLastPathComponent;
-	openPanel.allowedFileTypes	=	[PGResourceAdapter supportedFileTypes];
+	//	2026/10/28 allowedFileTypes relied on HFS type codes (eg, 'fold') which
+	//	macOS no longer honors, so folders could not be chosen in the panel
+	NSMutableArray<UTType *> *const contentTypes = [NSMutableArray arrayWithObjects:UTTypeFolder, UTTypeVolume, nil];
+	for(NSString *const fileType in [PGResourceAdapter supportedFileTypes]) {
+		if([fileType hasPrefix:@"'"]) continue;	//	quoted HFS type code
+		UTType *const type = [UTType typeWithFilenameExtension:fileType];
+		if(type) [contentTypes addObject:type];
+	}
+	openPanel.allowedContentTypes	=	contentTypes;
 	NSModalResponse	response	=	[openPanel runModal];
 #else
 	NSString *const path = [URL isFileURL] ? [URL path] : nil;
@@ -256,6 +271,14 @@ static PGDocumentController *PGSharedDocumentController = nil;
 #endif
 	if(response == NSModalResponseOK) {
 		PGDocument *const oldDoc = self.currentDocument;
+		//	2026/10/28 apply the chosen folder depth; folders which are already
+		//	open at a different depth are rescanned
+		NSInteger const depth = depthPopUp.selectedTag;
+		[[NSUserDefaults standardUserDefaults] setInteger:depth forKey:PGMaxDepthKey];
+		for(NSURL *const URL in openPanel.URLs) {
+			PGDocument *const doc = [self documentForIdentifier:URL.PG_resourceIdentifier];
+			if(doc && doc.folderMaxDepth != depth) [self reopenFolderDocument:doc atNode:doc.displayController.activeNode];
+		}
 	//	[self application:NSApp openFiles:[openPanel filenames]];
 		[self application:NSApp openURLs:openPanel.URLs];
 
@@ -594,6 +617,23 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 	return [self _openNew:!doc document:doc ? doc : [[[PGDocument alloc] initWithBookmark:aBookmark] autorelease] display:flag];
 #endif
 }
+- (void)reopenFolderDocument:(PGDocument *)document atNode:(PGNode *)node	//	2026/10/28 added
+{
+	//	rescans a folder using the current PGMaxDepthKey value; archives,
+	//	PDFs, etc. always load their entire contents so are left as they are
+	if(![document.node.resourceAdapter isKindOfClass:[PGFolderAdapter class]]) return;
+	PGDisplayController *const displayController = document.displayController;
+	PGDisplayableIdentifier *const nodeIdent = node.identifier;
+	PGDocument *const replacement = [[PGDocument alloc] initWithIdentifier:document.rootIdentifier];
+	[self _openNew:YES document:replacement display:NO];
+	//	hand the window over before closing the old document so that the
+	//	window (and full screen mode) stays open and keeps its frame
+	replacement.displayController = displayController;
+	[document close];
+	PGNode *const replacementNode = nodeIdent ? [replacement.node.resourceAdapter nodeForIdentifier:nodeIdent] : nil;
+	if(replacementNode) [displayController activateNode:replacementNode];
+	self.currentDocument = replacement;
+}
 - (void)noteNewRecentDocument:(PGDocument *)document
 {
 	[self _changeRecentDocumentIdentifiersWithDocument:document prepend:YES];
@@ -841,6 +881,35 @@ HandlePostEnterFullScreen(PGFloatingPanelController *panel, BeforeState state) {
 	return document;
 }
 
+- (NSPopUpButton *)_folderDepthPopUpButton	//	2026/10/28 added
+{
+	//	same choices as the View > Folder Depth menu and the preferences pop-up
+	NSPopUpButton *const popUp = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
+	[popUp addItemWithTitle:NSLocalizedString(@"Top Level Only", @"Folder depth choice: don't look inside subfolders.")];
+	popUp.lastItem.tag = 0;
+	[popUp addItemWithTitle:NSLocalizedString(@"1 Level of Subfolders", @"Folder depth choice.")];
+	popUp.lastItem.tag = 1;
+	for(NSInteger depth = 2; depth <= 10; depth++) {
+		[popUp addItemWithTitle:[NSString localizedStringWithFormat:NSLocalizedString(@"%ld Levels of Subfolders", @"Folder depth choice. %ld is replaced with the number of levels."), (long)depth]];
+		popUp.lastItem.tag = depth;
+	}
+	[popUp addItemWithTitle:NSLocalizedString(@"All Subfolders", @"Folder depth choice: look inside every subfolder.")];
+	popUp.lastItem.tag = PGMaxDepthAll;
+	if(![popUp selectItemWithTag:[[NSUserDefaults standardUserDefaults] integerForKey:PGMaxDepthKey]])
+		[popUp selectItemWithTag:PGMaxDepthAll];
+	[popUp sizeToFit];
+	return popUp;
+}
+- (NSView *)_openPanelAccessoryViewWithFolderDepthPopUp:(NSPopUpButton *)popUp	//	2026/10/28 added
+{
+	NSTextField *const label = [NSTextField labelWithString:NSLocalizedString(@"Folder depth:", @"Label for the folder depth pop-up in the Open panel.")];
+	NSStackView *const stack = [NSStackView stackViewWithViews:@[label, popUp]];
+	stack.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+	stack.alignment = NSLayoutAttributeFirstBaseline;
+	stack.edgeInsets = NSEdgeInsetsMake(8.0f, 20.0f, 8.0f, 20.0f);
+	[stack setFrameSize:stack.fittingSize];
+	return stack;
+}
 - (void)_setRecentDocumentIdentifiers:(NSArray<PGDisplayableIdentifier*> *)anArray {
 //NSLog(@"-[PGDocumentController _setRecentDocumentIdentifiers:] self = %p", self);
 	NSParameterAssert(anArray);

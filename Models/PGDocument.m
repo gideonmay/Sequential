@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 // Models
 #import "PGNode.h"
+#import "PGContainerAdapter.h"
 #import "PGGenericImageAdapter.h"
 #import "PGResourceIdentifier.h"
 #import "PGSubscription.h"
@@ -108,6 +109,7 @@ NSString *const PGDocumentUpdateRecursivelyKey = @"PGDocumentUpdateRecursively";
 #else
 		_rootIdentifier = [ident retain];
 #endif
+		_folderMaxDepth = [[NSUserDefaults standardUserDefaults] integerForKey:PGMaxDepthKey];	//	2026/10/28 added
 		_node = [[PGNode alloc] initWithParent:self identifier:ident];
 		_node.dataProvider = [PGDataProvider providerWithResourceIdentifier:ident];
 		[_rootIdentifier PG_addObserver:self selector:@selector(identifierIconDidChange:) name:PGDisplayableIdentifierIconDidChangeNotification];

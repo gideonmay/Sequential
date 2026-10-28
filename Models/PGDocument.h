@@ -90,6 +90,7 @@ extern NSString *const PGDocumentUpdateRecursivelyKey;
 @property (readonly, getter = isOnline) BOOL online;
 @property (readonly) NSMenu *pageMenu;
 @property (nonatomic, getter = isProcessingNodes) BOOL processingNodes; // Batch changes for performance.
+@property (readonly) NSInteger folderMaxDepth;	//	2026/10/28 added: PGMaxDepthKey value when created
 #else
 @property(readonly) PGDisplayableIdentifier *rootIdentifier;
 @property(readonly) PGNode *node;
