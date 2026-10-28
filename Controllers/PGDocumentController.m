@@ -146,6 +146,8 @@ static PGDocumentController *PGSharedDocumentController = nil;
 @property (nonatomic, strong) NSArray<NSImageView *> *loadingThumbnailViews;
 @property (nonatomic, assign) CFAbsoluteTime loadingLastThumbnailTime;
 @property (nonatomic, assign) BOOL loadingThumbnailPending;
+@property (nonatomic, assign) NSUInteger loadingGeneration;	//	guarded by @synchronized(self)
+@property (nonatomic, strong) id loadingThumbnailResult;	//	NSImage or NSNull; guarded by @synchronized(self)
 
 //	NSMutableDictionary *_classesByExtension;	2023/10/29 not used; removed
 
@@ -161,6 +163,8 @@ static PGDocumentController *PGSharedDocumentController = nil;
 - (IBAction)_stopLoading:(id)sender;	//	2026/10/28 added
 - (void)_addLoadingThumbnailWithImageSource:(CGImageSourceRef (^)(void))createImageSource;	//	2026/10/28 added
 - (void)_pushLoadingThumbnail:(NSImage *)image;	//	2026/10/28 added
+- (void)_collectLoadingThumbnail;	//	2026/10/28 added
+- (void)_openIfNoDocuments;	//	2026/10/28 added
 
 @end
 
@@ -674,6 +678,10 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 	_loadingProgressStopped = NO;
 	_loadingLastThumbnailTime = 0.0;
 	_loadingThumbnailPending = NO;
+	@synchronized(self) {
+		_loadingGeneration++;	//	ignore thumbnails requested by an earlier load
+		_loadingThumbnailResult = nil;
+	}
 }
 - (void)endLoadingProgress	//	2026/10/28 added
 {
@@ -702,6 +710,7 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 	if(!_loadingPanel && now - _loadingStartTime < 0.4) return;
 	if(!_loadingPanel) [self _showLoadingPanel];
 	[self _updateLoadingPanelWithPath:path];
+	[self _collectLoadingThumbnail];
 	//	lets the panel draw and handle clicks on its Stop button; other
 	//	windows don't receive events while the modal session is running
 	[NSApp runModalSession:_loadingSession];
@@ -788,6 +797,10 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 	_loadingThumbnailPending = YES;
 	_loadingLastThumbnailTime = CFAbsoluteTimeGetCurrent();
 	NSPanel *const panel = _loadingPanel;
+	NSUInteger generation;
+	@synchronized(self) {
+		generation = _loadingGeneration;
+	}
 	NSDictionary *const options = @{
 		(id)kCGImageSourceCreateThumbnailFromImageAlways: @YES,
 		(id)kCGImageSourceCreateThumbnailWithTransform: @YES,
@@ -803,13 +816,25 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 			}
 			CFRelease(source);
 		}
-		//	the main queue is serviced while the loading panel's modal session runs
-		dispatch_async(dispatch_get_main_queue(), ^{
-			if(self.loadingPanel != panel) return;	//	loading has finished
-			self.loadingThumbnailPending = NO;
-			if(image) [self _pushLoadingThumbnail:image];
-		});
+		//	picked up by -_collectLoadingThumbnail during the next progress update;
+		//	not delivered via the main queue, which can't run while the load itself
+		//	is running inside a main queue block (eg, the Open panel at launch)
+		@synchronized(self) {
+			if(generation == self->_loadingGeneration)
+				self->_loadingThumbnailResult = image ? image : (id)[NSNull null];
+		}
 	});
+}
+- (void)_collectLoadingThumbnail	//	2026/10/28 added
+{
+	id result;
+	@synchronized(self) {
+		result = _loadingThumbnailResult;
+		_loadingThumbnailResult = nil;
+	}
+	if(!result) return;
+	_loadingThumbnailPending = NO;
+	if([result isKindOfClass:[NSImage class]]) [self _pushLoadingThumbnail:result];
 }
 - (void)_pushLoadingThumbnail:(NSImage *)image	//	2026/10/28 added
 {
@@ -1293,10 +1318,14 @@ HandlePostEnterFullScreen(PGFloatingPanelController *panel, BeforeState state) {
 {
 	//	show the Open panel when launched without any documents; documents
 	//	opened from the Finder are delivered before this notification, and
-	//	the delay lets any pending open requests arrive first
-	dispatch_async(dispatch_get_main_queue(), ^{
-		if(!self.documents.count) [self open:nil];
-	});
+	//	the delay lets any pending open requests arrive first; not dispatched
+	//	to the main queue because a document opened from the panel would then
+	//	load inside a main queue block, which blocks other main queue blocks
+	[self performSelector:@selector(_openIfNoDocuments) withObject:nil afterDelay:0.0];
+}
+- (void)_openIfNoDocuments	//	2026/10/28 added
+{
+	if(!self.documents.count) [self open:nil];
 }
 
 - (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename
