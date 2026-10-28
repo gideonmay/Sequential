@@ -108,6 +108,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 {
 	return (uint64_t) [[self valueForFMAttributeName:NSFileSize] unsignedLongValue];
 }
+- (NSData *)fourCCData	//	2026/10/28 added
+{
+	//	-[PGDataProvider fourCCData] gets the first bytes from -data which reads
+	//	the entire file when it can't be memory-mapped (eg, on external volumes),
+	//	which made opening a folder of large archives take minutes
+	NSFileHandle *const handle = [NSFileHandle fileHandleForReadingFromURL:_identifier.URL error:NULL];
+	if(!handle) return [super fourCCData];
+	NSData *const data = [handle readDataUpToLength:5 error:NULL];
+	[handle closeAndReturnError:NULL];
+	return data.length > 4 ? [data subdataWithRange:NSMakeRange(0, 4)] : nil;
+}
 
 //	MARK: -
 

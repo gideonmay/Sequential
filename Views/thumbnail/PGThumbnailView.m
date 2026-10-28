@@ -1416,6 +1416,10 @@ SetEqualsSet(NSSet *const nsSet1, NSSet *const nsSet2) {
 {
 	BOOL const hadSelection = 0 != [self _selectionCount];
 	NSArray *items = [self.dataSource itemsForThumbnailView:self];
+	//	2026/10/28 a folder or archive which hasn't been loaded (eg, beyond the
+	//	folder depth, or after loading was stopped) has no children array;
+	//	a nil _items failed an assertion when validating the selection
+	if(!items) items = @[];
 	if(![_items isEqualToArray:items]) {
 #if !__has_feature(objc_arc)
 		[_items release];

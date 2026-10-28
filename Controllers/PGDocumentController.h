@@ -203,6 +203,19 @@ typedef NS_ENUM(NSUInteger, PGImageScaleConstraint) {
 - (id)openDocumentWithContentsOfURL:(NSURL *)URL display:(BOOL)flag;
 - (id)openDocumentWithBookmark:(PGBookmark *)aBookmark display:(BOOL)flag;
 - (void)reopenFolderDocument:(PGDocument *)document atNode:(PGNode *)node;	//	2026/10/28 added
+
+//	2026/10/28 added: loading progress; folders and archives are loaded on the
+//	main thread so a progress panel is shown (as a modal session, which keeps
+//	the app responsive) when loading takes a while; calls may be nested
+- (void)beginLoadingProgressWithName:(NSString *)name;
+- (void)endLoadingProgress;
+- (void)noteLoadingProgressForPath:(NSString *)path;
+@property (readonly) BOOL loadingProgressStopped;	//	the user clicked Stop
+//	the panel shows a strip of recently loaded images; thumbnails are created
+//	on a background queue and are only wanted every so often
+@property (readonly) BOOL loadingProgressWantsThumbnail;
+- (void)addLoadingProgressThumbnailFromURL:(NSURL *)URL;
+- (void)addLoadingProgressThumbnailFromData:(NSData *)data;
 - (void)noteNewRecentDocument:(PGDocument *)document;
 - (void)noteDeletedRecentDocument:(PGDocument *)document;
 

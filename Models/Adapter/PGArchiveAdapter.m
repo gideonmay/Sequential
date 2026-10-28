@@ -109,6 +109,7 @@ StringAtDepth(NSInteger depth) {
 @property (nonatomic, strong) XADArchive *archive;
 @property (nonatomic, assign) BOOL needsPassword;
 @property (nonatomic, strong) PGNode *currentSubnode;
+@property (nonatomic, assign) BOOL addedLoadingThumbnail;	//	2026/10/28 added
 
 - (void)_threaded_setError:(NSError *)error forNode:(PGNode *)node;
 - (void)_updateThumbnailsOfChildren;
@@ -140,11 +141,26 @@ StringAtDepth(NSInteger depth) {
 	NSParameterAssert(_archive);
 	NSMutableArray *const children = [NSMutableArray array];
 	NSUInteger i = indexes.firstIndex;
+	PGDocumentController *const dc = [PGDocumentController sharedDocumentController];	//	2026/10/28 added
 	for(; NSNotFound != i; i = [indexes indexGreaterThanIndex:i]) {
+		if(dc.loadingProgressStopped) break;
 		@autoreleasepool {	//	REQUIRED otherwise the heap blows up (try it on a 50000 entry zip file)
 			NSString *const entryPath = [_archive nameOfEntry:(int) i];
 			if(!entryPath)
 				continue;
+			[dc noteLoadingProgressForPath:entryPath];
+			//	at most one thumbnail per archive because extracting a late
+			//	entry of a solid archive decompresses everything before it
+			if(!_addedLoadingThumbnail && dc.loadingProgressWantsThumbnail &&
+			   ![_archive entryIsDirectory:(int) i] && ![_archive entryIsEncrypted:(int) i] &&
+			   [[UTType typeWithFilenameExtension:entryPath.pathExtension] conformsToType:UTTypeImage]) {
+				_addedLoadingThumbnail = YES;
+				NSData *data;
+				@synchronized(_archive) {
+					data = [_archive contentsOfEntry:(int) i];
+				}
+				if(data) [dc addLoadingProgressThumbnailFromData:data];
+			}
 
 #if 1
 			if(PG_entryIsInvisibleForName(entryPath))
@@ -306,6 +322,7 @@ StringAtDepth(NSInteger depth) {
 		XADError error = XADNoError;
 		PGDataProvider *const dataProvider = self.dataProvider;
 		PGResourceIdentifier *const ident = dataProvider.identifier;
+		[[PGDocumentController sharedDocumentController] noteLoadingProgressForPath:ident.URL.path];	//	2026/10/28 added
 		if([dataProvider archive]) @synchronized([dataProvider archive]) {
 			_archive = [[XADArchive alloc] initWithArchive:[dataProvider archive]
 													 entry:[dataProvider entry]

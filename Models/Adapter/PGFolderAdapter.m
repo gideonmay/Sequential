@@ -35,6 +35,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGResourceDataProvider.h"
 #import "PGDataProvider.h"
 
+// Controllers
+#import "PGDocumentController.h"
+
 // Other Sources
 #import "PGFoundationAdditions.h"
 
@@ -140,12 +143,19 @@ IsVisibleInFinder(NSURL* pageURL) {
 #endif
 	NSMutableArray *const newPages = [NSMutableArray array];
 	NSString *const path = URL.path;
+	PGDocumentController *const dc = [PGDocumentController sharedDocumentController];	//	2026/10/28 added
 	for(NSString *const pathComponent in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:path error:NULL]) {
+		if(dc.loadingProgressStopped) break;
 		NSString *const pagePath = [path stringByAppendingPathComponent:pathComponent];
+		[dc noteLoadingProgressForPath:pagePath];
 		if([PGIgnoredPaths containsObject:pagePath]) continue;
 		NSURL *const pageURL = [pagePath PG_fileURL];
 		if(!IsVisibleInFinder(pageURL))
 			continue;
+
+		if(dc.loadingProgressWantsThumbnail &&	//	2026/10/28 added
+		   [[UTType typeWithFilenameExtension:pagePath.pathExtension] conformsToType:UTTypeImage])
+			[dc addLoadingProgressThumbnailFromURL:pageURL];
 
 		PGDisplayableIdentifier *const pageIdent = pageURL.PG_displayableIdentifier;
 		PGNode *node = [self childForIdentifier:pageIdent];

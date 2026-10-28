@@ -590,6 +590,13 @@ static inline NSPoint PGPointInRect(NSPoint aPoint, NSRect aRect)
 	}
 	return self;
 }
+- (BOOL)clipsToBounds	//	2026/10/28 added
+{
+	//	views no longer clip to their bounds by default when built against
+	//	the macOS 14 or later SDK; without clipping, each thumbnail column drew
+	//	its translucent background over the columns to its left, darkening them
+	return YES;
+}
 
 //	MARK: -
 

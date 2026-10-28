@@ -24,6 +24,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGDocumentController.h"
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import <ImageIO/ImageIO.h>
 #import <sys/resource.h>
 #import <objc/Protocol.h>
 #import <tgmath.h>
@@ -87,6 +88,10 @@ static NSString* const deprecated_PGShowCountsAndSizesOnContainerThumbnailKey = 
 NSString *const PGMouseClickActionKey = @"PGMouseClickAction";
 NSString *const PGBackwardsInitialLocationKey = @"PGBackwardsInitialLocation";
 
+//	2026/10/28 added: loading progress panel thumbnails
+static NSUInteger const PGLoadingThumbnailCount = 6;
+static CGFloat const PGLoadingThumbnailSize = 64.0f;
+
 //	TODO: work out if these can be removed
 static NSString *const PGRecentItemsKey = @"PGRecentItems2";
 static NSString *const PGRecentItemsDeprecated2Key = @"PGRecentItems"; // Deprecated after 1.3.2
@@ -127,6 +132,21 @@ static PGDocumentController *PGSharedDocumentController = nil;
 @property (nonatomic, strong) PGTimerPanelController *timerPanel;
 @property (nonatomic, strong) PGActivityPanelController *activityPanel;
 
+//	2026/10/28 added: loading progress
+@property (nonatomic, strong) NSPanel *loadingPanel;
+@property (nonatomic, strong) NSTextField *loadingCountField;
+@property (nonatomic, strong) NSTextField *loadingPathField;
+@property (nonatomic, assign) NSModalSession loadingSession;
+@property (nonatomic, copy) NSString *loadingName;
+@property (nonatomic, assign) NSUInteger loadingNesting;
+@property (nonatomic, assign) NSUInteger loadingItemCount;
+@property (nonatomic, assign) CFAbsoluteTime loadingStartTime;
+@property (nonatomic, assign) CFAbsoluteTime loadingLastUpdateTime;
+@property (nonatomic, assign) BOOL loadingProgressStopped;
+@property (nonatomic, strong) NSArray<NSImageView *> *loadingThumbnailViews;
+@property (nonatomic, assign) CFAbsoluteTime loadingLastThumbnailTime;
+@property (nonatomic, assign) BOOL loadingThumbnailPending;
+
 //	NSMutableDictionary *_classesByExtension;	2023/10/29 not used; removed
 
 - (void)_awakeAfterLocalizing;
@@ -136,6 +156,11 @@ static PGDocumentController *PGSharedDocumentController = nil;
 - (void)_changeRecentDocumentIdentifiersWithDocument:(PGDocument *)document prepend:(BOOL)prepend;
 - (NSPopUpButton *)_folderDepthPopUpButton;	//	2026/10/28 added
 - (NSView *)_openPanelAccessoryViewWithFolderDepthPopUp:(NSPopUpButton *)popUp;	//	2026/10/28 added
+- (void)_showLoadingPanel;	//	2026/10/28 added
+- (void)_updateLoadingPanelWithPath:(NSString *)path;	//	2026/10/28 added
+- (IBAction)_stopLoading:(id)sender;	//	2026/10/28 added
+- (void)_addLoadingThumbnailWithImageSource:(CGImageSourceRef (^)(void))createImageSource;	//	2026/10/28 added
+- (void)_pushLoadingThumbnail:(NSImage *)image;	//	2026/10/28 added
 
 @end
 
@@ -594,9 +619,11 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 	if(!ident) return nil;
 	PGDocument *const doc = [self documentForIdentifier:ident];
 #if __has_feature(objc_arc)
-	return [self _openNew:!doc
-				 document:doc ? doc : [[PGDocument alloc] initWithIdentifier:ident.displayableIdentifier]
-				  display:flag];
+	if(doc) return [self _openNew:NO document:doc display:flag];
+	[self beginLoadingProgressWithName:ident.displayableIdentifier.displayName];	//	2026/10/28 added
+	PGDocument *const newDoc = [[PGDocument alloc] initWithIdentifier:ident.displayableIdentifier];
+	[self endLoadingProgress];
+	return [self _openNew:YES document:newDoc display:flag];
 #else
 	return [self _openNew:!doc document:doc ? doc : [[(PGDocument *)[PGDocument alloc] initWithIdentifier:[ident displayableIdentifier]] autorelease] display:flag];
 #endif
@@ -610,9 +637,11 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 	PGDocument *const doc = [self documentForIdentifier:aBookmark.documentIdentifier];
 	[doc openBookmark:aBookmark];
 #if __has_feature(objc_arc)
-	return [self _openNew:!doc
-				 document:doc ? doc : [[PGDocument alloc] initWithBookmark:aBookmark]
-				  display:flag];
+	if(doc) return [self _openNew:NO document:doc display:flag];
+	[self beginLoadingProgressWithName:aBookmark.documentIdentifier.displayName];	//	2026/10/28 added
+	PGDocument *const newDoc = [[PGDocument alloc] initWithBookmark:aBookmark];
+	[self endLoadingProgress];
+	return [self _openNew:YES document:newDoc display:flag];
 #else
 	return [self _openNew:!doc document:doc ? doc : [[[PGDocument alloc] initWithBookmark:aBookmark] autorelease] display:flag];
 #endif
@@ -624,7 +653,9 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 	if(![document.node.resourceAdapter isKindOfClass:[PGFolderAdapter class]]) return;
 	PGDisplayController *const displayController = document.displayController;
 	PGDisplayableIdentifier *const nodeIdent = node.identifier;
+	[self beginLoadingProgressWithName:document.rootIdentifier.displayName];
 	PGDocument *const replacement = [[PGDocument alloc] initWithIdentifier:document.rootIdentifier];
+	[self endLoadingProgress];
 	[self _openNew:YES document:replacement display:NO];
 	//	hand the window over before closing the old document so that the
 	//	window (and full screen mode) stays open and keeps its frame
@@ -633,6 +664,164 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 	PGNode *const replacementNode = nodeIdent ? [replacement.node.resourceAdapter nodeForIdentifier:nodeIdent] : nil;
 	if(replacementNode) [displayController activateNode:replacementNode];
 	self.currentDocument = replacement;
+}
+- (void)beginLoadingProgressWithName:(NSString *)name	//	2026/10/28 added
+{
+	if(_loadingNesting++) return;
+	_loadingName = [name copy];
+	_loadingItemCount = 0;
+	_loadingStartTime = _loadingLastUpdateTime = CFAbsoluteTimeGetCurrent();
+	_loadingProgressStopped = NO;
+	_loadingLastThumbnailTime = 0.0;
+	_loadingThumbnailPending = NO;
+}
+- (void)endLoadingProgress	//	2026/10/28 added
+{
+	NSParameterAssert(_loadingNesting);
+	if(--_loadingNesting) return;
+	if(_loadingPanel) {
+		[NSApp endModalSession:_loadingSession];
+		_loadingSession = NULL;
+		[_loadingPanel orderOut:self];
+		_loadingPanel = nil;
+		_loadingCountField = nil;
+		_loadingPathField = nil;
+		_loadingThumbnailViews = nil;
+	}
+	_loadingName = nil;
+	_loadingProgressStopped = NO;
+}
+- (void)noteLoadingProgressForPath:(NSString *)path	//	2026/10/28 added
+{
+	if(!_loadingNesting) return;	//	eg, rescanning a folder after a file system event
+	_loadingItemCount++;
+	CFAbsoluteTime const now = CFAbsoluteTimeGetCurrent();
+	if(now - _loadingLastUpdateTime < 1.0 / 20.0) return;
+	_loadingLastUpdateTime = now;
+	//	avoid flashing the panel when loading is quick
+	if(!_loadingPanel && now - _loadingStartTime < 0.4) return;
+	if(!_loadingPanel) [self _showLoadingPanel];
+	[self _updateLoadingPanelWithPath:path];
+	//	lets the panel draw and handle clicks on its Stop button; other
+	//	windows don't receive events while the modal session is running
+	[NSApp runModalSession:_loadingSession];
+}
+- (void)_showLoadingPanel	//	2026/10/28 added
+{
+	NSTextField *const titleField = [NSTextField labelWithString:[NSString stringWithFormat:NSLocalizedString(@"Opening \u201C%@\u201D", @"Loading progress panel title. %@ is replaced with the folder or archive name."), _loadingName ? _loadingName : @""]];
+	titleField.font = [NSFont boldSystemFontOfSize:NSFont.systemFontSize];
+	titleField.lineBreakMode = NSLineBreakByTruncatingMiddle;
+	_loadingCountField = [NSTextField labelWithString:@""];
+	_loadingCountField.font = [NSFont monospacedDigitSystemFontOfSize:NSFont.smallSystemFontSize weight:NSFontWeightRegular];
+	_loadingPathField = [NSTextField labelWithString:@""];
+	_loadingPathField.font = [NSFont systemFontOfSize:NSFont.smallSystemFontSize];
+	_loadingPathField.textColor = NSColor.secondaryLabelColor;
+	_loadingPathField.lineBreakMode = NSLineBreakByTruncatingMiddle;
+	NSProgressIndicator *const indicator = [NSProgressIndicator new];
+	indicator.style = NSProgressIndicatorStyleBar;
+	indicator.indeterminate = YES;
+	indicator.usesThreadedAnimation = YES;	//	the main thread is busy loading
+	[indicator startAnimation:self];
+	NSButton *const stopButton = [NSButton buttonWithTitle:NSLocalizedString(@"Stop", @"Loading progress panel button which stops loading and shows what has been found so far.") target:self action:@selector(_stopLoading:)];
+	stopButton.keyEquivalent = @"\033";
+	stopButton.toolTip = NSLocalizedString(@"Stop loading and show what has been found so far.", @"Tool tip of the loading progress panel's Stop button.");
+	NSStackView *const buttonRow = [NSStackView stackViewWithViews:@[[NSView new], stopButton]];
+	NSMutableArray<NSImageView *> *const thumbnailViews = [NSMutableArray array];
+	for(NSUInteger i = 0; i < PGLoadingThumbnailCount; i++) {
+		NSImageView *const view = [NSImageView new];
+		view.imageScaling = NSImageScaleProportionallyUpOrDown;
+		[view.widthAnchor constraintEqualToConstant:PGLoadingThumbnailSize].active = YES;
+		[view.heightAnchor constraintEqualToConstant:PGLoadingThumbnailSize].active = YES;
+		[thumbnailViews addObject:view];
+	}
+	_loadingThumbnailViews = thumbnailViews;
+	NSStackView *const thumbnailRow = [NSStackView stackViewWithViews:thumbnailViews];
+	thumbnailRow.distribution = NSStackViewDistributionEqualSpacing;
+	NSStackView *const stack = [NSStackView stackViewWithViews:@[titleField, indicator, thumbnailRow, _loadingCountField, _loadingPathField, buttonRow]];
+	stack.orientation = NSUserInterfaceLayoutOrientationVertical;
+	stack.alignment = NSLayoutAttributeLeading;
+	stack.spacing = 8.0f;
+	stack.edgeInsets = NSEdgeInsetsMake(20.0f, 20.0f, 20.0f, 20.0f);
+	for(NSView *const view in @[titleField, indicator, thumbnailRow, _loadingCountField, _loadingPathField, buttonRow])
+		[view.widthAnchor constraintEqualToAnchor:stack.widthAnchor constant:-40.0f].active = YES;
+	for(NSTextField *const field in @[titleField, _loadingPathField])
+		[field setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+
+	_loadingPanel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0.0f, 0.0f, 460.0f, 150.0f)
+											   styleMask:NSWindowStyleMaskTitled
+												 backing:NSBackingStoreBuffered
+												   defer:NO];
+	_loadingPanel.title = NSLocalizedString(@"Loading", @"Loading progress panel window title.");
+	_loadingPanel.releasedWhenClosed = NO;
+	_loadingPanel.contentView = stack;
+	[stack.widthAnchor constraintEqualToConstant:460.0f].active = YES;
+	[_loadingPanel center];
+	_loadingSession = [NSApp beginModalSessionForWindow:_loadingPanel];
+}
+- (void)_updateLoadingPanelWithPath:(NSString *)path	//	2026/10/28 added
+{
+	_loadingCountField.stringValue = _loadingProgressStopped ?
+		NSLocalizedString(@"Stopping\u2026", @"Loading progress panel status after Stop was clicked.") :
+		[NSString localizedStringWithFormat:NSLocalizedString(@"%lu items found", @"Loading progress panel status. %lu is replaced with the number of files, folders and archive entries found so far."), (unsigned long)_loadingItemCount];
+	_loadingPathField.stringValue = path ? [path stringByAbbreviatingWithTildeInPath] : @"";
+}
+- (BOOL)loadingProgressWantsThumbnail	//	2026/10/28 added
+{
+	return _loadingPanel && !_loadingThumbnailPending &&
+		CFAbsoluteTimeGetCurrent() - _loadingLastThumbnailTime >= 0.5;
+}
+- (void)addLoadingProgressThumbnailFromURL:(NSURL *)URL	//	2026/10/28 added
+{
+	[self _addLoadingThumbnailWithImageSource:^CGImageSourceRef{
+		return CGImageSourceCreateWithURL((__bridge CFURLRef)URL, NULL);
+	}];
+}
+- (void)addLoadingProgressThumbnailFromData:(NSData *)data	//	2026/10/28 added
+{
+	[self _addLoadingThumbnailWithImageSource:^CGImageSourceRef{
+		return CGImageSourceCreateWithData((__bridge CFDataRef)data, NULL);
+	}];
+}
+- (void)_addLoadingThumbnailWithImageSource:(CGImageSourceRef (^)(void))createImageSource	//	2026/10/28 added
+{
+	if(!_loadingPanel) return;
+	_loadingThumbnailPending = YES;
+	_loadingLastThumbnailTime = CFAbsoluteTimeGetCurrent();
+	NSPanel *const panel = _loadingPanel;
+	NSDictionary *const options = @{
+		(id)kCGImageSourceCreateThumbnailFromImageAlways: @YES,
+		(id)kCGImageSourceCreateThumbnailWithTransform: @YES,
+		(id)kCGImageSourceThumbnailMaxPixelSize: @(PGLoadingThumbnailSize * panel.backingScaleFactor)};
+	dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+		NSImage *image = nil;
+		CGImageSourceRef const source = createImageSource();
+		if(source) {
+			CGImageRef const thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, (__bridge CFDictionaryRef)options);
+			if(thumbnail) {
+				image = [[NSImage alloc] initWithCGImage:thumbnail size:NSZeroSize];
+				CGImageRelease(thumbnail);
+			}
+			CFRelease(source);
+		}
+		//	the main queue is serviced while the loading panel's modal session runs
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if(self.loadingPanel != panel) return;	//	loading has finished
+			self.loadingThumbnailPending = NO;
+			if(image) [self _pushLoadingThumbnail:image];
+		});
+	});
+}
+- (void)_pushLoadingThumbnail:(NSImage *)image	//	2026/10/28 added
+{
+	NSUInteger const count = _loadingThumbnailViews.count;
+	for(NSUInteger i = 0; i + 1 < count; i++)
+		_loadingThumbnailViews[i].image = _loadingThumbnailViews[i + 1].image;
+	_loadingThumbnailViews.lastObject.image = image;
+}
+- (IBAction)_stopLoading:(id)sender	//	2026/10/28 added
+{
+	_loadingProgressStopped = YES;
+	[self _updateLoadingPanelWithPath:_loadingPathField.stringValue];
 }
 - (void)noteNewRecentDocument:(PGDocument *)document
 {
@@ -1099,6 +1288,16 @@ HandlePostEnterFullScreen(PGFloatingPanelController *panel, BeforeState state) {
 }
 
 //	MARK: - <NSApplicationDelegate>
+
+- (void)applicationDidFinishLaunching:(NSNotification *)aNotif	//	2026/10/28 added
+{
+	//	show the Open panel when launched without any documents; documents
+	//	opened from the Finder are delivered before this notification, and
+	//	the delay lets any pending open requests arrive first
+	dispatch_async(dispatch_get_main_queue(), ^{
+		if(!self.documents.count) [self open:nil];
+	});
+}
 
 - (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename
 {

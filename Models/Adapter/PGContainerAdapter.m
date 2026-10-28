@@ -29,6 +29,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGNode.h"
 #import "PGResourceIdentifier.h"
 
+// Controllers
+#import "PGDocumentController.h"	//	2026/10/28 added
+
 // Other Sources
 #import "PGFoundationAdditions.h"
 
@@ -327,7 +330,8 @@ NSString *const PGMaxDepthKey = @"PGMaxDepth";
 
 - (void)loadIfNecessary
 {
-	if(self.shouldRecursivelyCreateChildren) [super loadIfNecessary];
+	//	2026/10/28 don't load any more containers after the user clicked Stop
+	if(self.shouldRecursivelyCreateChildren && ![PGDocumentController sharedDocumentController].loadingProgressStopped) [super loadIfNecessary];
 	else [self.node loadFinishedForAdapter:self];
 }
 
@@ -372,6 +376,26 @@ NSString *const PGMaxDepthKey = @"PGMaxDepth";
 - (BOOL)isContainer
 {
 	return YES;
+}
+//	2026/10/28 added: folders and archives show the thumbnail of their first
+//	page instead of their file icon, which is barely visible in the film strip
+- (PGResourceAdapter *)_firstPageAdapter
+{
+	PGNode *const first = [self sortedViewableNodeFirst:YES stopAtNode:nil includeSelf:NO];
+	return first && first != self.node ? first.resourceAdapter : nil;
+}
+- (BOOL)hasRealThumbnail
+{
+	return super.hasRealThumbnail || self._firstPageAdapter.hasRealThumbnail;
+}
+- (NSImage *)thumbnail
+{
+	NSImage *const realThumbnail = self.realThumbnail;
+	if(realThumbnail) return realThumbnail;
+	PGResourceAdapter *const firstPage = self._firstPageAdapter;
+	if(firstPage.hasRealThumbnail) return firstPage.realThumbnail;
+	(void)firstPage.thumbnail;	//	starts generating it
+	return super.thumbnail;
 }
 - (BOOL)hasChildren
 {

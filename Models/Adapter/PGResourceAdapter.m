@@ -311,6 +311,9 @@ static NSString *const PGCFBundleTypeExtensionsKey = @"CFBundleTypeExtensions";
 		_realThumbnail = [anImage retain];
 #endif
 		[self.document noteNodeThumbnailDidChange:self.node recursively:NO];
+		//	2026/10/28 folders and archives show the thumbnail of their first page
+		for(PGResourceAdapter *ancestor = self.parentAdapter; ancestor; ancestor = ancestor.parentAdapter)
+			[self.document noteNodeThumbnailDidChange:ancestor.node recursively:NO];
 	}
 }
 - (BOOL)canGenerateRealThumbnail
