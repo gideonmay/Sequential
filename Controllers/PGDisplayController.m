@@ -24,7 +24,6 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGDisplayController.h"
 #import <unistd.h>
-#import <sys/xattr.h>	//	2026/10/28 added for Finder tags
 #import <tgmath.h>
 #import <QuartzCore/QuartzCore.h>	//	2024/08/14 added for -invertColors:
 
@@ -202,6 +201,7 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 - (void)_updateAmbientBackground;	//	2026/10/28 added
 - (void)_moveActiveNodeToTrash;	//	2026/10/28 added
 - (NSURL *)_URLForFinderTags;	//	2026/10/28 added
+- (void)_finderTagsDidChange;	//	2026/10/28 added
 - (void)_flashInfoPanel;	//	2026/10/28 added
 - (void)_fadeOutFlashedInfoPanel;	//	2026/10/28 added
 
@@ -567,48 +567,12 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	}];
 }
 
-//	2026/10/28 added: Finder tags. They're read and written as the extended
-//	attribute that holds them, a list of "name\nlabel" strings (the label number
-//	is the tag's color, an index into -[NSWorkspace fileLabels]), so that tags
-//	that are already there keep their colors
-static char const PGFinderTagsAttributeName[] = "com.apple.metadata:_kMDItemUserTags";
-
-static NSArray<NSString *> *
-PGFinderTagsOfURL(NSURL *URL)
-{
-	char const *const path = URL.fileSystemRepresentation;
-	ssize_t const size = getxattr(path, PGFinderTagsAttributeName, NULL, 0, 0, 0);
-	if(size <= 0 || size > 1 << 20) return @[];
-	NSMutableData *const data = [NSMutableData dataWithLength:size];
-	if(getxattr(path, PGFinderTagsAttributeName, data.mutableBytes, size, 0, 0) != size) return @[];
-	id const list = [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable format:NULL error:NULL];
-	if(![list isKindOfClass:[NSArray class]]) return @[];
-	NSMutableArray<NSString *> *const tags = [NSMutableArray array];
-	for(id const tag in list) if([tag isKindOfClass:[NSString class]]) [tags addObject:tag];
-	return tags;
-}
-static BOOL
-PGSetFinderTagsOfURL(NSURL *URL, NSArray<NSString *> *tags)
-{
-	char const *const path = URL.fileSystemRepresentation;
-	if(!tags.count) return 0 == removexattr(path, PGFinderTagsAttributeName, 0) || ENOATTR == errno;
-	NSData *const data = [NSPropertyListSerialization dataWithPropertyList:tags format:NSPropertyListBinaryFormat_v1_0 options:0 error:NULL];
-	return data && 0 == setxattr(path, PGFinderTagsAttributeName, data.bytes, data.length, 0, 0);
-}
+//	2026/10/28 added: Finder tags (see PGFinderTagsOfURL())
 static NSString *
 PGFinderTagName(NSString *tag)
 {
 	NSRange const r = [tag rangeOfString:@"\n" options:NSBackwardsSearch];
 	return NSNotFound == r.location ? tag : [tag substringToIndex:r.location];
-}
-static NSUInteger
-PGFinderTagLabel(NSString *tag, NSArray<NSString *> *labels)
-{
-	NSRange const r = [tag rangeOfString:@"\n" options:NSBackwardsSearch];
-	//	a tag without a color has one if it has a label's name
-	NSInteger const label = NSNotFound == r.location ?
-		(NSInteger)[labels indexOfObject:tag] : [tag substringFromIndex:NSMaxRange(r)].integerValue;
-	return label > 0 && label < (NSInteger)labels.count ? (NSUInteger)label : 0;
 }
 static NSUInteger
 PGIndexOfFinderTagNamed(NSArray<NSString *> *tags, NSString *name)
@@ -640,15 +604,13 @@ PGFinderTagImage(NSColor *color)
 	if(NSNotFound != i) [tags removeObjectAtIndex:i];
 	else [tags addObject:[NSString stringWithFormat:@"%@\n%ld", labels[label], (long)label]];
 	if(!PGSetFinderTagsOfURL(URL, tags)) return NSBeep();
-	[self _updateInfoPanelText];
-	[self _flashInfoPanel];
+	[self _finderTagsDidChange];
 }
 - (IBAction)removeFinderTags:(id)sender	//	2026/10/28 added
 {
 	NSURL *const URL = [self _URLForFinderTags];
 	if(!URL || !PGSetFinderTagsOfURL(URL, @[])) return NSBeep();
-	[self _updateInfoPanelText];
-	[self _flashInfoPanel];
+	[self _finderTagsDidChange];
 }
 
 //	MARK: -
@@ -2189,6 +2151,15 @@ PGFinderTagImage(NSColor *color)
 	PGResourceIdentifier *const ident = node.identifier;
 	return ident.isFileIdentifier && node.isViewable ? ident.URL : nil;
 }
+- (void)_finderTagsDidChange	//	2026/10/28 added
+{
+	//	the info bubble and the thumbnail show the new tags
+	PGNode *const node = self.activeNode;
+	[node.identifier noteFinderTagsDidChange];
+	[self.activeDocument noteNodeThumbnailDidChange:node recursively:NO];
+	[self _updateInfoPanelText];
+	[self _flashInfoPanel];
+}
 - (void)_flashInfoPanel	//	2026/10/28 added
 {
 	//	shows the info bubble for a moment when it's hidden, so that the change
@@ -2452,19 +2423,11 @@ PGFinderTagImage(NSColor *color)
 	} else text = NSLocalizedString(@"No image", @"Label for when no image is being displayed in the window.");
 	((PGInfoView *)_infoPanel.contentView).stringValue = text;
 
-	//	2026/10/28 the image's Finder tags that have a color
-	NSMutableArray<NSColor *> *const tagColors = [NSMutableArray array];
-	NSURL *const URL = [self _URLForFinderTags];
-	if(URL) {
-		NSWorkspace *const workspace = NSWorkspace.sharedWorkspace;
-		NSArray<NSString *> *const labels = workspace.fileLabels;
-		NSArray<NSColor *> *const colors = workspace.fileLabelColors;
-		for(NSString *const tag in PGFinderTagsOfURL(URL)) {
-			NSUInteger const label = PGFinderTagLabel(tag, labels);
-			if(label && label < colors.count) [tagColors addObject:colors[label]];
-		}
-	}
-	((PGInfoView *)_infoPanel.contentView).tagColors = tagColors;
+	//	2026/10/28 the image's Finder tags that have a color; they're reread so
+	//	that tags changed elsewhere (eg, in the Finder) are shown when the image is
+	[node.identifier noteFinderTagsDidChange];
+	if(node) [self.activeDocument noteNodeThumbnailDidChange:node recursively:NO];
+	((PGInfoView *)_infoPanel.contentView).tagColors = [self _URLForFinderTags] ? node.identifier.tagColors : nil;
 }
 - (void)_setCopyAsDesktopPicturePanelDidEnd:(NSSavePanel *)savePanel returnCode:(NSInteger)returnCode contextInfo:(void *)contextInfo
 {

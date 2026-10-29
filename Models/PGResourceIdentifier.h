@@ -120,6 +120,7 @@ typedef UInt8 PGLabelColor;
 @property (nonatomic, copy) NSString *naturalDisplayName; // The name from the filesystem or raw address of the URL.
 //@property(readonly) PGLabelColor labelColor;	2021/07/21 modernized
 @property (nonatomic, readonly) NSColor* labelColor;
+@property (nonatomic, readonly) NSArray<NSColor *> *tagColors;	//	2026/10/28 added: the colors of the file's Finder tags (cached)
 #else
 @property(assign) BOOL postsNotifications;
 @property(retain) NSImage *icon;
@@ -132,8 +133,17 @@ typedef UInt8 PGLabelColor;
 
 - (NSAttributedString *)attributedStringWithAncestory:(BOOL)flag;
 - (void)noteNaturalDisplayNameDidChange;
+- (void)noteFinderTagsDidChange;	//	2026/10/28 added: rereads the tags next time
 
 @end
+
+//	2026/10/28 added: Finder tags are read and written as the extended attribute
+//	that holds them, a list of "name\nlabel" strings (the label number is the
+//	tag's color, an index into -[NSWorkspace fileLabels]), so that tags that
+//	are already there keep their colors
+extern NSArray<NSString *> *PGFinderTagsOfURL(NSURL *URL);
+extern BOOL PGSetFinderTagsOfURL(NSURL *URL, NSArray<NSString *> *tags);
+extern NSUInteger PGFinderTagLabel(NSString *tag, NSArray<NSString *> *labels);	//	0 if it has no color
 
 //	MARK: -
 

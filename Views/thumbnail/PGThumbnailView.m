@@ -2002,7 +2002,7 @@ if(activeNode == item)
 			[layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:labelRect.origin];
 #endif
 			[shadow set];
-		} else {
+		} else if(![self.dataSource thumbnailView:self tagColorsForItem:item].count) {	//	2026/10/28 tags are drawn below
 			NSColor *const labelColor = [self.dataSource thumbnailView:self labelColorForItem:item];
 			if(labelColor) {
 				NSRect const labelRect = NSMakeRect(NSMaxX(frame) - 16.0f, round(MAX(NSMaxY(thumbnailRect) - 16.0f, NSMidY(thumbnailRect) - 6.0f)), 12.0f, 12.0f);
@@ -2017,6 +2017,27 @@ if(activeNode == item)
 				CGContextEndTransparencyLayer(context);
 				[NSGraphicsContext restoreGraphicsState];
 			}
+		}
+
+		//	2026/10/28 the Finder tags as overlapping dots in the top right corner
+		//	of the thumbnail, the first tag on the left
+		NSArray<NSColor *> *const tagColors = [self.dataSource thumbnailView:self tagColorsForItem:item];
+		if(tagColors.count) {
+			CGFloat const diameter = 11.0f, step = 7.0f;
+			NSUInteger const n = MIN(tagColors.count, (NSUInteger)7);
+			CGFloat const right = MIN(NSMaxX(thumbnailRect), NSMaxX(frame)) - 4.0f;
+			NSRect dotRect = NSMakeRect(right - diameter - step * (n - 1), NSMinY(thumbnailRect) + 4.0f, diameter, diameter);
+			[NSGraphicsContext saveGraphicsState];
+			[nilShadow set];
+			for(NSUInteger t = 0; t < n; t++, dotRect.origin.x += step) {
+				NSBezierPath *const dot = [NSBezierPath bezierPathWithOvalInRect:dotRect];
+				[tagColors[t] setFill];
+				[dot fill];
+				[[NSColor colorWithDeviceWhite:1.0f alpha:enabled ? 1.0f : 0.5f] setStroke];
+				dot.lineWidth = 1.5f;
+				[dot stroke];
+			}
+			[NSGraphicsContext restoreGraphicsState];
 		}
 	}
 #if 0	//	debugging

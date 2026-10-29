@@ -95,6 +95,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 - (NSURL *)thumbnailView:(PGThumbnailView *)sender urlForItem:(id)item;	//	2023/10/14
 - (NSString *)thumbnailView:(PGThumbnailView *)sender labelForItem:(id)item;
 - (NSColor *)thumbnailView:(PGThumbnailView *)sender labelColorForItem:(id)item;
+- (NSArray<NSColor *> *)thumbnailView:(PGThumbnailView *)sender tagColorsForItem:(id)item;	//	2026/10/28 added
 - (NSRect)thumbnailView:(PGThumbnailView *)sender highlightRectForItem:(id)item; // A rect within {{0, 0}, {1, 1}}.
 - (BOOL)thumbnailView:(PGThumbnailView *)sender hasRealThumbnailForItem:(id)item;
 

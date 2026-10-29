@@ -820,6 +820,10 @@ static NSArray<NSURL *> *PGFileURLsOfNodes(NSArray<PGNode *> *nodes, BOOL neares
 	NSAssert([item isKindOfClass:[PGNode class]], @"item is PGNode*");
 	return ((PGNode *)item).identifier.URL;
 }
+- (NSArray<NSColor *> *)thumbnailView:(PGThumbnailView *)sender tagColorsForItem:(id)item	//	2026/10/28 added
+{
+	return ((PGNode *)item).identifier.tagColors;
+}
 - (NSColor *)thumbnailView:(PGThumbnailView *)sender labelColorForItem:(id)item
 {
 #if 1

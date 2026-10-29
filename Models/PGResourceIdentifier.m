@@ -27,6 +27,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 // Models
 #import "PGSubscription.h"
 
+#include <sys/xattr.h>	//	2026/10/28 added for Finder tags
+
 // Other Sources
 #import "PGAttachments.h"
 #import "PGFoundationAdditions.h"
@@ -37,6 +39,8 @@ NSString *const PGDisplayableIdentifierDisplayNameDidChangeNotification = @"PGDi
 #if __has_feature(objc_arc)
 
 @interface PGDisplayableIdentifier ()
+
+@property (nonatomic, copy) NSArray<NSColor *> *cachedTagColors;	//	2026/10/28 added
 
 - (instancetype)initWithIdentifier:(PGResourceIdentifier *)ident NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithCoder:(NSCoder *)coder;//NS_DESIGNATED_INITIALIZER;
@@ -384,6 +388,29 @@ NSString *const PGDisplayableIdentifierDisplayNameDidChangeNotification = @"PGDi
 #endif
 	_naturalDisplayName = [aString copy];
 	[self noteNaturalDisplayNameDidChange];
+}
+- (NSArray<NSColor *> *)tagColors	//	2026/10/28 added
+{
+	//	cached because the thumbnails ask for them every time they're drawn
+	if(!self.cachedTagColors) {
+		NSMutableArray<NSColor *> *const tagColors = [NSMutableArray array];
+		NSURL *const URL = self.isFileIdentifier ? self.URL : nil;
+		if(URL) {
+			NSWorkspace *const workspace = NSWorkspace.sharedWorkspace;
+			NSArray<NSString *> *const labels = workspace.fileLabels;
+			NSArray<NSColor *> *const colors = workspace.fileLabelColors;
+			for(NSString *const tag in PGFinderTagsOfURL(URL)) {
+				NSUInteger const label = PGFinderTagLabel(tag, labels);
+				if(label && label < colors.count) [tagColors addObject:colors[label]];
+			}
+		}
+		self.cachedTagColors = tagColors;
+	}
+	return self.cachedTagColors;
+}
+- (void)noteFinderTagsDidChange	//	2026/10/28 added
+{
+	self.cachedTagColors = nil;
 }
 #if 1
 - (NSColor*)labelColor
@@ -975,3 +1002,41 @@ NSString *const PGDisplayableIdentifierDisplayNameDidChangeNotification = @"PGDi
 }
 
 @end
+
+//	MARK: -	2026/10/28 added: Finder tags
+
+static char const PGFinderTagsAttributeName[] = "com.apple.metadata:_kMDItemUserTags";
+
+NSArray<NSString *> *
+PGFinderTagsOfURL(NSURL *URL)
+{
+	char const *const path = URL.fileSystemRepresentation;
+	if(!path) return @[];
+	ssize_t const size = getxattr(path, PGFinderTagsAttributeName, NULL, 0, 0, 0);
+	if(size <= 0 || size > 1 << 20) return @[];
+	NSMutableData *const data = [NSMutableData dataWithLength:size];
+	if(getxattr(path, PGFinderTagsAttributeName, data.mutableBytes, size, 0, 0) != size) return @[];
+	id const list = [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable format:NULL error:NULL];
+	if(![list isKindOfClass:[NSArray class]]) return @[];
+	NSMutableArray<NSString *> *const tags = [NSMutableArray array];
+	for(id const tag in list) if([tag isKindOfClass:[NSString class]]) [tags addObject:tag];
+	return tags;
+}
+BOOL
+PGSetFinderTagsOfURL(NSURL *URL, NSArray<NSString *> *tags)
+{
+	char const *const path = URL.fileSystemRepresentation;
+	if(!path) return NO;
+	if(!tags.count) return 0 == removexattr(path, PGFinderTagsAttributeName, 0) || ENOATTR == errno;
+	NSData *const data = [NSPropertyListSerialization dataWithPropertyList:tags format:NSPropertyListBinaryFormat_v1_0 options:0 error:NULL];
+	return data && 0 == setxattr(path, PGFinderTagsAttributeName, data.bytes, data.length, 0, 0);
+}
+NSUInteger
+PGFinderTagLabel(NSString *tag, NSArray<NSString *> *labels)
+{
+	NSRange const r = [tag rangeOfString:@"\n" options:NSBackwardsSearch];
+	//	a tag without a color has one if it has a label's name
+	NSInteger const label = NSNotFound == r.location ?
+		(NSInteger)[labels indexOfObject:tag] : [tag substringFromIndex:NSMaxRange(r)].integerValue;
+	return label > 0 && label < (NSInteger)labels.count ? (NSUInteger)label : 0;
+}
