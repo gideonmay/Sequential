@@ -24,6 +24,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGDisplayController.h"
 #import <unistd.h>
+#import <sys/xattr.h>	//	2026/10/28 added for Finder tags
 #import <tgmath.h>
 #import <QuartzCore/QuartzCore.h>	//	2024/08/14 added for -invertColors:
 
@@ -200,6 +201,9 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 - (void)_endPageTransition;	//	2026/10/28 added
 - (void)_updateAmbientBackground;	//	2026/10/28 added
 - (void)_moveActiveNodeToTrash;	//	2026/10/28 added
+- (NSURL *)_URLForFinderTags;	//	2026/10/28 added
+- (void)_flashInfoPanel;	//	2026/10/28 added
+- (void)_fadeOutFlashedInfoPanel;	//	2026/10/28 added
 
 - (void)_setClipViewBackground;
 - (void)_setImageView:(PGImageView *)aView;
@@ -561,6 +565,90 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 				if(node.identifier.URL && newURLs[node.identifier.URL]) [node removeFromDocument];
 		});
 	}];
+}
+
+//	2026/10/28 added: Finder tags. They're read and written as the extended
+//	attribute that holds them, a list of "name\nlabel" strings (the label number
+//	is the tag's color, an index into -[NSWorkspace fileLabels]), so that tags
+//	that are already there keep their colors
+static char const PGFinderTagsAttributeName[] = "com.apple.metadata:_kMDItemUserTags";
+
+static NSArray<NSString *> *
+PGFinderTagsOfURL(NSURL *URL)
+{
+	char const *const path = URL.fileSystemRepresentation;
+	ssize_t const size = getxattr(path, PGFinderTagsAttributeName, NULL, 0, 0, 0);
+	if(size <= 0 || size > 1 << 20) return @[];
+	NSMutableData *const data = [NSMutableData dataWithLength:size];
+	if(getxattr(path, PGFinderTagsAttributeName, data.mutableBytes, size, 0, 0) != size) return @[];
+	id const list = [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable format:NULL error:NULL];
+	if(![list isKindOfClass:[NSArray class]]) return @[];
+	NSMutableArray<NSString *> *const tags = [NSMutableArray array];
+	for(id const tag in list) if([tag isKindOfClass:[NSString class]]) [tags addObject:tag];
+	return tags;
+}
+static BOOL
+PGSetFinderTagsOfURL(NSURL *URL, NSArray<NSString *> *tags)
+{
+	char const *const path = URL.fileSystemRepresentation;
+	if(!tags.count) return 0 == removexattr(path, PGFinderTagsAttributeName, 0) || ENOATTR == errno;
+	NSData *const data = [NSPropertyListSerialization dataWithPropertyList:tags format:NSPropertyListBinaryFormat_v1_0 options:0 error:NULL];
+	return data && 0 == setxattr(path, PGFinderTagsAttributeName, data.bytes, data.length, 0, 0);
+}
+static NSString *
+PGFinderTagName(NSString *tag)
+{
+	NSRange const r = [tag rangeOfString:@"\n" options:NSBackwardsSearch];
+	return NSNotFound == r.location ? tag : [tag substringToIndex:r.location];
+}
+static NSUInteger
+PGFinderTagLabel(NSString *tag, NSArray<NSString *> *labels)
+{
+	NSRange const r = [tag rangeOfString:@"\n" options:NSBackwardsSearch];
+	//	a tag without a color has one if it has a label's name
+	NSInteger const label = NSNotFound == r.location ?
+		(NSInteger)[labels indexOfObject:tag] : [tag substringFromIndex:NSMaxRange(r)].integerValue;
+	return label > 0 && label < (NSInteger)labels.count ? (NSUInteger)label : 0;
+}
+static NSUInteger
+PGIndexOfFinderTagNamed(NSArray<NSString *> *tags, NSString *name)
+{
+	return [tags indexOfObjectPassingTest:^BOOL(NSString *tag, NSUInteger i, BOOL *stop) {
+		return NSOrderedSame == [PGFinderTagName(tag) localizedCaseInsensitiveCompare:name];
+	}];
+}
+static NSImage *
+PGFinderTagImage(NSColor *color)
+{
+	return [NSImage imageWithSize:NSMakeSize(12.0f, 12.0f) flipped:NO drawingHandler:^BOOL(NSRect dstRect) {
+		[color setFill];
+		[[NSBezierPath bezierPathWithOvalInRect:NSInsetRect(dstRect, 1.0f, 1.0f)] fill];
+		return YES;
+	}];
+}
+
+- (IBAction)toggleFinderTag:(id)sender	//	2026/10/28 added
+{
+	//	adds the tag with the label's name (the user may have renamed it), or
+	//	removes it if the image has it; other tags are kept
+	NSArray<NSString *> *const labels = NSWorkspace.sharedWorkspace.fileLabels;
+	NSInteger const label = [sender tag];
+	NSURL *const URL = [self _URLForFinderTags];
+	if(!URL || label <= 0 || label >= (NSInteger)labels.count) return NSBeep();
+	NSMutableArray<NSString *> *const tags = [PGFinderTagsOfURL(URL) mutableCopy];
+	NSUInteger const i = PGIndexOfFinderTagNamed(tags, labels[label]);
+	if(NSNotFound != i) [tags removeObjectAtIndex:i];
+	else [tags addObject:[NSString stringWithFormat:@"%@\n%ld", labels[label], (long)label]];
+	if(!PGSetFinderTagsOfURL(URL, tags)) return NSBeep();
+	[self _updateInfoPanelText];
+	[self _flashInfoPanel];
+}
+- (IBAction)removeFinderTags:(id)sender	//	2026/10/28 added
+{
+	NSURL *const URL = [self _URLForFinderTags];
+	if(!URL || !PGSetFinderTagsOfURL(URL, @[])) return NSBeep();
+	[self _updateInfoPanelText];
+	[self _flashInfoPanel];
 }
 
 //	MARK: -
@@ -2094,6 +2182,26 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 		});
 	}];
 }
+- (NSURL *)_URLForFinderTags	//	2026/10/28 added
+{
+	//	only files on disk (not, eg, images in archives or PDF pages)
+	PGNode *const node = self.activeNode;
+	PGResourceIdentifier *const ident = node.identifier;
+	return ident.isFileIdentifier && node.isViewable ? ident.URL : nil;
+}
+- (void)_flashInfoPanel	//	2026/10/28 added
+{
+	//	shows the info bubble for a moment when it's hidden, so that the change
+	//	of the image's tags can be seen
+	if(self.shouldShowInfo) return;
+	[_infoPanel displayOverWindow:self.window];
+	[NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(_fadeOutFlashedInfoPanel) object:nil];
+	[self performSelector:@selector(_fadeOutFlashedInfoPanel) withObject:nil afterDelay:1.5];
+}
+- (void)_fadeOutFlashedInfoPanel	//	2026/10/28 added
+{
+	if(!self.shouldShowInfo) [_infoPanel fadeOut];
+}
 - (void)_updateAmbientBackground	//	2026/10/28 added
 {
 	//	not while colors are inverted: the image is inverted by a layer filter
@@ -2343,6 +2451,20 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 		if(parent.parentNode) text = [NSString stringWithFormat:@"%@ %C %@", parent.identifier.displayName, (unichar)0x25B8, text];
 	} else text = NSLocalizedString(@"No image", @"Label for when no image is being displayed in the window.");
 	((PGInfoView *)_infoPanel.contentView).stringValue = text;
+
+	//	2026/10/28 the image's Finder tags that have a color
+	NSMutableArray<NSColor *> *const tagColors = [NSMutableArray array];
+	NSURL *const URL = [self _URLForFinderTags];
+	if(URL) {
+		NSWorkspace *const workspace = NSWorkspace.sharedWorkspace;
+		NSArray<NSString *> *const labels = workspace.fileLabels;
+		NSArray<NSColor *> *const colors = workspace.fileLabelColors;
+		for(NSString *const tag in PGFinderTagsOfURL(URL)) {
+			NSUInteger const label = PGFinderTagLabel(tag, labels);
+			if(label && label < colors.count) [tagColors addObject:colors[label]];
+		}
+	}
+	((PGInfoView *)_infoPanel.contentView).tagColors = tagColors;
 }
 - (void)_setCopyAsDesktopPicturePanelDidEnd:(NSSavePanel *)savePanel returnCode:(NSInteger)returnCode contextInfo:(void *)contextInfo
 {
@@ -2617,6 +2739,19 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 	}
 	if(@selector(toggleColorInversion:) == action) anItem.state = self.imageView.wantsLayer;
 	if(@selector(changeBackgroundStyle:) == action) anItem.state = [[NSUserDefaults standardUserDefaults] integerForKey:PGBackgroundStyleKey] == tag;
+	if(@selector(toggleFinderTag:) == action || @selector(removeFinderTags:) == action) {	//	2026/10/28 added
+		NSURL *const URL = [self _URLForFinderTags];
+		if(@selector(removeFinderTags:) == action) return URL != nil;
+		//	the user's names and colors of the labels
+		NSWorkspace *const workspace = NSWorkspace.sharedWorkspace;
+		NSArray<NSString *> *const labels = workspace.fileLabels;
+		NSArray<NSColor *> *const colors = workspace.fileLabelColors;
+		if(tag <= 0 || tag >= (NSInteger)labels.count || tag >= (NSInteger)colors.count) return NO;
+		anItem.title = labels[tag];
+		anItem.image = PGFinderTagImage(colors[tag]);
+		anItem.state = URL && NSNotFound != PGIndexOfFinderTagNamed(PGFinderTagsOfURL(URL), labels[tag]);
+		return URL != nil;
+	}
 	if(@selector(changeFolderDepth:) == action) {
 		//	archives, PDFs, etc. always load their entire contents
 		if(![self.activeDocument.node.resourceAdapter isKindOfClass:[PGFolderAdapter class]]) return NO;
@@ -3123,7 +3258,8 @@ proposedFrame.size.width, proposedFrame.size.height); */
 }
 - (BOOL)clipView:(PGClipView *)sender handleKeyDown:(NSEvent *)anEvent
 {
-	NSUInteger const modifiers = (NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagOption) & anEvent.modifierFlags;
+	//	2026/10/28 Control added: ⌃0–⌃7 are the Tags shortcuts, not timer keys
+	NSUInteger const modifiers = (NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagOption | NSEventModifierFlagControl) & anEvent.modifierFlags;
 	unsigned short const keyCode = anEvent.keyCode;
 	if(!modifiers) switch(keyCode) {
 		case PGKeyEscape: return [[PGDocumentController sharedDocumentController] performEscapeKeyAction];

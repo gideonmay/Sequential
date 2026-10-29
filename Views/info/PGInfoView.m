@@ -61,10 +61,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 	style.alignment = NSTextAlignmentCenter;
 	style.lineBreakMode = NSLineBreakByTruncatingMiddle;
 #if __has_feature(objc_arc)
-	return [[NSAttributedString alloc] initWithString:self.stringValue attributes:@{
+	NSDictionary *const attributes = @{
 		NSFontAttributeName: [NSFont labelFontOfSize:0.0f],
 		NSForegroundColorAttributeName: NSColor.whiteColor,
-		NSParagraphStyleAttributeName: style}];
+		NSParagraphStyleAttributeName: style};
+	NSMutableAttributedString *const string = [[NSMutableAttributedString alloc] initWithString:self.stringValue attributes:attributes];
+	//	2026/10/28 a dot in each tag's color after the name
+	if(self.tagColors.count) [string appendAttributedString:[[NSAttributedString alloc] initWithString:@" " attributes:attributes]];
+	for(NSColor *const color in self.tagColors) {
+		NSMutableDictionary *const dotAttributes = [attributes mutableCopy];
+		dotAttributes[NSForegroundColorAttributeName] = color;
+		[string appendAttributedString:[[NSAttributedString alloc] initWithString:@"\u25CF" attributes:dotAttributes]];
+	}
+	return string;
 #elif 1
 	return [[[NSAttributedString alloc] initWithString:self.stringValue attributes:@{
 		NSFontAttributeName: [NSFont labelFontOfSize:0.0f],
@@ -100,6 +109,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 	[_stringValue release];
 #endif
 	_stringValue = [string copy];
+	[self setNeedsDisplay:YES];
+	[self PG_postNotificationName:PGBezelPanelFrameShouldChangeNotification];
+}
+- (void)setTagColors:(NSArray<NSColor *> *)colors	//	2026/10/28 added
+{
+	if(colors == _tagColors || [colors isEqual:_tagColors]) return;
+	_tagColors = [colors copy];
 	[self setNeedsDisplay:YES];
 	[self PG_postNotificationName:PGBezelPanelFrameShouldChangeNotification];
 }

@@ -151,6 +151,62 @@
                                     <action selector="setCopyAsDesktopPicture:" target="-1" id="1224"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Tags" id="PTg-mn-itm">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Tags" id="PTg-mn-mnu">
+                                    <items>
+                                        <menuItem title="Red" tag="6" keyEquivalent="1" id="PTg-00-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="toggleFinderTag:" target="-1" id="PTg-00-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Orange" tag="7" keyEquivalent="2" id="PTg-01-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="toggleFinderTag:" target="-1" id="PTg-01-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Yellow" tag="5" keyEquivalent="3" id="PTg-02-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="toggleFinderTag:" target="-1" id="PTg-02-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Green" tag="2" keyEquivalent="4" id="PTg-03-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="toggleFinderTag:" target="-1" id="PTg-03-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Blue" tag="4" keyEquivalent="5" id="PTg-04-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="toggleFinderTag:" target="-1" id="PTg-04-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Purple" tag="3" keyEquivalent="6" id="PTg-05-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="toggleFinderTag:" target="-1" id="PTg-05-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Gray" tag="1" keyEquivalent="7" id="PTg-06-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="toggleFinderTag:" target="-1" id="PTg-06-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PTg-sp-itm"/>
+                                        <menuItem title="Remove All Tags" keyEquivalent="0" id="PTg-rm-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES"/>
+                                            <connections>
+                                                <action selector="removeFinderTags:" target="-1" id="PTg-rm-act"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="953">
                                 <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                             </menuItem>

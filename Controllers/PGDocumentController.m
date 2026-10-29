@@ -1493,7 +1493,9 @@ static void (*PGNSMenuItemSetEnabled)(id, SEL, BOOL);
 		if(equiv.length != 1) continue;
 		unsigned short const keyCode = PGKeyCodeFromUnichar([equiv characterAtIndex:0]);
 		if(PGKeyUnknown == keyCode || anEvent.keyCode != keyCode) continue; // Some non-English keyboard layouts switch to English when the Command key is held, but that doesn't help our shortcuts that don't use Command, so we have to check by key code.
-		NSUInteger const modifiersMask = NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagOption;
+		//	2026/10/28 Control added, so that the ⌃1–⌃7 Tags shortcuts don't run for
+		//	1–7 (which set the timer) and vice versa
+		NSUInteger const modifiersMask = NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagOption | NSEventModifierFlagControl;
 		if((anEvent.modifierFlags & modifiersMask) != (item.keyEquivalentModifierMask & modifiersMask)) continue;
 		return [item PG_performAction];
 	}

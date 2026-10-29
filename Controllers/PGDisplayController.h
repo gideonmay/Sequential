@@ -101,6 +101,8 @@ extern NSString *const PGDisplayControllerTimerDidChangeNotification;
 - (IBAction)setAsDesktopPicture:(id)sender;
 - (IBAction)setCopyAsDesktopPicture:(id)sender;
 - (IBAction)moveToTrash:(id)sender;
+- (IBAction)toggleFinderTag:(id)sender;	//	2026/10/28 added; the sender's tag is the label number
+- (IBAction)removeFinderTags:(id)sender;	//	2026/10/28 added
 
 - (IBAction)copy:(id)sender;
 - (IBAction)selectAll:(id)sender;

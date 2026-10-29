@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 @property (nonatomic, assign) NSUInteger count;
 @property (nonatomic, assign) NSUInteger currentFolderIndex;	//	2023/10/01 added
 @property (nonatomic, assign) NSUInteger currentFolderCount;	//	2023/10/01 added
+@property (nonatomic, copy) NSArray<NSColor *> *tagColors;	//	2026/10/28 added: the image's Finder tags, drawn as dots after the name
 @property (readonly) BOOL showsProgressBar;
 @property (nonatomic, assign) PGRectCorner originCorner;
 
