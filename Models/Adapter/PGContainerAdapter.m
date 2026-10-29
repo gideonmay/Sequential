@@ -468,9 +468,15 @@ NSString *const PGMaxDepthKey = @"PGMaxDepth";
 	PGNode *const node = children && flag ? [self sortedViewableNodeFirst:YES stopAtNode:nil includeSelf:NO] : nil;
 	return node ? node : [super sortedViewableNodeNext:flag includeChildren:children];
 }
+- (BOOL)loadDeferredChildrenIfAllowed	//	2026/10/28 added
+{
+	return NO;
+}
 - (PGNode *)sortedViewableNodeFirst:(BOOL)flag stopAtNode:(PGNode *)descendent includeSelf:(BOOL)includeSelf
 {
 	if(descendent == self.node) return nil;
+	if([self loadDeferredChildrenIfAllowed])	//	2026/10/28 added
+		return [self.node.resourceAdapter sortedViewableNodeFirst:flag stopAtNode:descendent includeSelf:includeSelf];
 	if(flag) {
 		PGNode *const child = [super sortedViewableNodeFirst:YES stopAtNode:descendent includeSelf:includeSelf];
 		if(child) return child;
@@ -485,6 +491,8 @@ NSString *const PGMaxDepthKey = @"PGMaxDepth";
 }
 - (PGNode *)sortedFirstViewableNodeInFolderFirst:(BOOL)flag
 {
+	if([self loadDeferredChildrenIfAllowed])	//	2026/10/28 added
+		return [self.node.resourceAdapter sortedFirstViewableNodeInFolderFirst:flag];
 	if(flag) return [self sortedViewableNodeFirst:YES];
 	NSArray *const children = self.sortedChildren;
 	for(PGNode *const child in [children reverseObjectEnumerator]) {

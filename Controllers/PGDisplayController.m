@@ -218,6 +218,8 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 - (void)_moveActiveNodeToTrash;	//	2026/10/28 added
 - (NSURL *)_URLForFinderTags;	//	2026/10/28 added
 - (BOOL)_nodeMatchesTagFilter:(PGNode *)node;	//	2026/10/28 added
+- (void)_performLoadingDeferredArchives:(void (^)(void))block;	//	2026/10/28 added
+- (BOOL)_tryToGoForward:(BOOL)forward allowAlerts:(BOOL)flag;	//	2026/10/28 added
 - (PGNode *)_nodeMatchingTagFilterFrom:(PGNode *)node forward:(BOOL)forward;	//	2026/10/28 added
 - (void)_flashInfoPanel;	//	2026/10/28 added
 - (void)_fadeOutFlashedInfoPanel;	//	2026/10/28 added
@@ -888,44 +890,60 @@ PGFinderTagImage(NSColor *color)
 
 - (IBAction)firstPage:(id)sender
 {
-	[self setActiveNode:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:YES] forward:YES];
+	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
+		[self setActiveNode:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:YES] forward:YES];
+	}];
 }
 - (IBAction)lastPage:(id)sender
 {
-	[self setActiveNode:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO] forward:NO];
+	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
+		[self setActiveNode:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO] forward:NO];
+	}];
 }
 
 //	MARK: -
 
 - (IBAction)firstOfPreviousFolder:(id)sender
 {
-	if([self tryToSetActiveNode:[self.activeNode.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:NO] forward:YES]) return;
-	[self prepareToLoop]; // -firstOfPreviousFolder: is an exception to our usual looping mechanic, so we can't use -loopForward:.
-	PGNode *const last = [self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO];
-	[self tryToLoopForward:NO toNode:last.resourceAdapter.isSortedFirstViewableNodeOfFolder ? last : [last.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:YES] pageForward:YES allowAlerts:YES];
+	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
+		if([self tryToSetActiveNode:[self.activeNode.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:NO] forward:YES]) return;
+		[self prepareToLoop]; // -firstOfPreviousFolder: is an exception to our usual looping mechanic, so we can't use -loopForward:.
+		PGNode *const last = [self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO];
+		[self tryToLoopForward:NO toNode:last.resourceAdapter.isSortedFirstViewableNodeOfFolder ? last : [last.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:YES] pageForward:YES allowAlerts:YES];
+	}];
 }
 - (IBAction)firstOfNextFolder:(id)sender
 {
-	if([self tryToSetActiveNode:[self.activeNode.resourceAdapter sortedFirstViewableNodeInFolderNext:YES inclusive:NO] forward:YES]) return;
-	[self loopForward:YES];
+	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
+		if([self tryToSetActiveNode:[self.activeNode.resourceAdapter sortedFirstViewableNodeInFolderNext:YES inclusive:NO] forward:YES]) return;
+		[self loopForward:YES];
+	}];
 }
 - (IBAction)skipBeforeFolder:(id)sender
 {
-	if([self tryToSetActiveNode:[self.activeNode.resourceAdapter.containerAdapter sortedViewableNodeNext:NO includeChildren:NO] forward:NO]) return;
-	[self loopForward:NO];
+	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
+		if([self tryToSetActiveNode:[self.activeNode.resourceAdapter.containerAdapter sortedViewableNodeNext:NO includeChildren:NO] forward:NO]) return;
+		[self loopForward:NO];
+	}];
 }
 - (IBAction)skipPastFolder:(id)sender
 {
-	if([self tryToSetActiveNode:[self.activeNode.resourceAdapter.containerAdapter sortedViewableNodeNext:YES includeChildren:NO] forward:YES]) return;
-	[self loopForward:YES];
+	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
+		if([self tryToSetActiveNode:[self.activeNode.resourceAdapter.containerAdapter sortedViewableNodeNext:YES includeChildren:NO] forward:YES]) return;
+		[self loopForward:YES];
+	}];
 }
 - (IBAction)firstOfFolder:(id)sender
 {
-	[self setActiveNode:[self.activeNode.resourceAdapter sortedViewableNodeInFolderFirst:YES] forward:YES];
+	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
+		[self setActiveNode:[self.activeNode.resourceAdapter sortedViewableNodeInFolderFirst:YES] forward:YES];
+	}];
 }
 - (IBAction)lastOfFolder:(id)sender
 {
-	[self setActiveNode:[self.activeNode.resourceAdapter sortedViewableNodeInFolderFirst:NO] forward:NO];
+	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
+		[self setActiveNode:[self.activeNode.resourceAdapter sortedViewableNodeInFolderFirst:NO] forward:NO];
+	}];
 }
 
 //	MARK: - Go To Page Number
@@ -1342,6 +1360,22 @@ PGFinderTagImage(NSColor *color)
 	return YES;
 }
 - (BOOL)tryToGoForward:(BOOL)forward allowAlerts:(BOOL)flag
+{
+	//	2026/10/28 archives are loaded when needed
+	__block BOOL result = NO;
+	[self _performLoadingDeferredArchives:^{
+		result = [self _tryToGoForward:forward allowAlerts:flag];
+	}];
+	return result;
+}
+- (void)_performLoadingDeferredArchives:(void (^)(void))block	//	2026/10/28 added
+{
+	//	not with a tag filter: pages in archives can't have tags, and loading
+	//	every archive that's skipped would be slow
+	if(self.activeDocument.tagFilter) block();
+	else [PGResourceAdapter performLoadingDeferredContainers:block];
+}
+- (BOOL)_tryToGoForward:(BOOL)forward allowAlerts:(BOOL)flag	//	2026/10/28 was -tryToGoForward:allowAlerts:
 {
 	//	2026/10/28 two pages side by side: forwards, the page after the second one;
 	//	backwards, the spread that ends with the previous page (decided when the
@@ -3111,7 +3145,10 @@ PGFinderTagImage(NSColor *color)
 		if(@selector(zoomOut:) == action && fabs([_imageView averageScaleFactor] - PGScaleMin) < 0.01f) return NO;
 	}
 	PGNode *const firstNode = [self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:YES];
-	if(!firstNode) { // We might have to get -firstNode anyway.
+	//	2026/10/28 with archives that aren't loaded yet, the first and last pages
+	//	may be in them (they're loaded when navigating)
+	BOOL const mayHaveUnloadedPages = self.activeDocument.hasDeferredArchives;
+	if(!firstNode && !(mayHaveUnloadedPages && self.activeNode)) { // We might have to get -firstNode anyway.
 		if(@selector(firstPage:) == action) return NO;
 		if(@selector(previousPage:) == action) return NO;
 		if(@selector(nextPage:) == action) return NO;
@@ -3123,7 +3160,7 @@ PGFinderTagImage(NSColor *color)
 		if(@selector(firstOfFolder:) == action) return NO;
 		if(@selector(lastOfFolder:) == action) return NO;
 	}
-	if(self.activeNode == firstNode) {
+	if(self.activeNode == firstNode && !mayHaveUnloadedPages) {
 		if(@selector(firstPage:) == action) return NO;
 	//	if(@selector(firstOfFolder:) == action) return NO;	see below specific test
 	}
@@ -3140,7 +3177,7 @@ PGFinderTagImage(NSColor *color)
 
 //	PGNode *const lastNode = [[[[self activeDocument] node] resourceAdapter] sortedViewableNodeFirst:NO];
 //	if([self activeNode] == lastNode) {
-	if(self.activeNode == [self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO]) {
+	if(!mayHaveUnloadedPages && self.activeNode == [self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO]) {
 		if(@selector(lastPage:) == action) return NO;
 	//	if(@selector(lastOfFolder:) == action) return NO;	see above specific test
 	}

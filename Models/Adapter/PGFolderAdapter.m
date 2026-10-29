@@ -129,37 +129,6 @@ IsVisibleInFinder(NSURL* pageURL) {
 #endif
 }
 
-//	2026/10/28 added: lists the subfolders of a folder on background threads
-//	(several at a time) while the folder's files are processed, so that their
-//	listings are in the file system's cache when they're loaded; on network
-//	volumes each listing is a round trip, which made up most of the loading time
-static void
-PGPrefetchSubfolderListings(NSArray<NSURL *> *URLs)
-{
-	static dispatch_queue_t queue;
-	static dispatch_semaphore_t slots;
-	static dispatch_once_t once;
-	dispatch_once(&once, ^{
-		queue = dispatch_queue_create("PGFolderAdapter.prefetch", DISPATCH_QUEUE_CONCURRENT);
-		slots = dispatch_semaphore_create(8);
-	});
-	for(NSURL *const URL in URLs) {
-		NSNumber *isDirectory = nil, *isPackage = nil;
-		[URL getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:NULL];
-		[URL getResourceValue:&isPackage forKey:NSURLIsPackageKey error:NULL];
-		if(!isDirectory.boolValue || isPackage.boolValue) continue;
-		dispatch_async(queue, ^{
-			dispatch_semaphore_wait(slots, DISPATCH_TIME_FOREVER);
-			@autoreleasepool {
-				(void)[[NSFileManager new] contentsOfDirectoryAtURL:URL
-					includingPropertiesForKeys:@[NSURLIsHiddenKey, NSURLIsDirectoryKey, NSURLIsPackageKey]
-					options:kNilOptions error:NULL];
-			}
-			dispatch_semaphore_signal(slots);
-		});
-	}
-}
-
 - (void)createChildren
 {
 	NSURL *const URL = [((PGDataProvider *)self.dataProvider).identifier URLByFollowingAliases:YES];
@@ -179,11 +148,6 @@ PGPrefetchSubfolderListings(NSArray<NSURL *> *URLs)
 	NSArray<NSURL *> *const pageURLs = [[NSFileManager defaultManager] contentsOfDirectoryAtURL:URL
 		includingPropertiesForKeys:@[NSURLIsHiddenKey, NSURLIsDirectoryKey, NSURLIsPackageKey, NSURLTypeIdentifierKey]
 		options:kNilOptions error:NULL];
-	//	2026/10/28 added: only the subfolders that will be loaded (see -shouldRecursivelyCreateChildren)
-	PGRecursionPolicy const policy = self.descendantRecursionPolicy;
-	if(PGRecurseToAnyDepth == policy || (PGRecurseToMaxDepth == policy &&
-	   self.depth <= [[[NSUserDefaults standardUserDefaults] objectForKey:PGMaxDepthKey] unsignedIntegerValue]))
-		PGPrefetchSubfolderListings(pageURLs);
 	for(NSURL *const pageURL in pageURLs) {
 		if(dc.loadingProgressStopped) break;
 		NSString *const pagePath = pageURL.path;

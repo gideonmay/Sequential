@@ -113,6 +113,7 @@ extern NSString *const PGDocumentUpdateRecursivelyKey;
 
 //	2026/10/28 added: changes to the files that can be undone with Edit > Undo
 @property (readonly) NSUndoManager *undoManager;
+@property (nonatomic, assign) BOOL hasDeferredArchives;	//	2026/10/28 added: some archives weren't loaded with their folder
 @property (nonatomic, assign) NSInteger tagFilter;	//	2026/10/28 added: the label number of the Finder tag the pages must have, PGAnyTagFilter, or 0 (not saved)
 - (void)moveNodesToTrash:(NSArray<PGNode *> *)nodes;	//	files on disk only; beeps if there are none
 - (BOOL)setFinderTags:(NSArray<NSString *> *)tags ofNode:(PGNode *)node actionName:(NSString *)actionName;

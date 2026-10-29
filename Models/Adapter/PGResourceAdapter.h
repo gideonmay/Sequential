@@ -62,6 +62,12 @@ typedef NS_ENUM(NSInteger, PGRecursionPolicy) {
 //	2026/10/28 added: loads a folder or archive which wasn't loaded because it
 //	is beyond the folder depth (its children are still subject to the depth)
 + (void)reloadNodeIgnoringMaxDepth:(PGNode *)node;
++ (PGNode *)nodeReloadingIgnoringMaxDepth;	//	2026/10/28 added
+//	2026/10/28 added: containers that weren't loaded with their folder (archives,
+//	see -[PGArchiveAdapter shouldRecursivelyCreateChildren]) are loaded when
+//	they're searched for pages while the block runs (eg, to show the next page)
++ (void)performLoadingDeferredContainers:(void (^)(void))block;
++ (BOOL)loadsDeferredContainers;
 
 - (instancetype)initWithNode:(PGNode *)node dataProvider:(PGDataProvider *)dataProvider NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;

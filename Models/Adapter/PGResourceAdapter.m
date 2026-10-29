@@ -159,6 +159,22 @@ static PGNode *PGNodeReloadingIgnoringMaxDepth = nil;	//	2026/10/28 added
 	[node reload];
 	PGNodeReloadingIgnoringMaxDepth = previous;
 }
++ (PGNode *)nodeReloadingIgnoringMaxDepth	//	2026/10/28 added
+{
+	return PGNodeReloadingIgnoringMaxDepth;
+}
+static NSUInteger PGLoadingDeferredContainers = 0;	//	2026/10/28 added
++ (void)performLoadingDeferredContainers:(void (^)(void))block	//	2026/10/28 added
+{
+	NSAssert(NSThread.isMainThread, @"");
+	PGLoadingDeferredContainers++;
+	block();
+	PGLoadingDeferredContainers--;
+}
++ (BOOL)loadsDeferredContainers	//	2026/10/28 added
+{
+	return PGLoadingDeferredContainers > 0;
+}
 - (BOOL)shouldRecursivelyCreateChildren
 {
 	if(PGNodeReloadingIgnoringMaxDepth && self.node == PGNodeReloadingIgnoringMaxDepth) return YES;	//	2026/10/28 added

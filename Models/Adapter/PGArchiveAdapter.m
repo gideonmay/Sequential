@@ -110,6 +110,8 @@ StringAtDepth(NSInteger depth) {
 @property (nonatomic, assign) BOOL needsPassword;
 @property (nonatomic, strong) PGNode *currentSubnode;
 @property (nonatomic, assign) BOOL addedLoadingThumbnail;	//	2026/10/28 added
+@property (nonatomic, assign) BOOL deferred;	//	2026/10/28 added: not loaded with its folder
+@property (nonatomic, assign) BOOL triedDeferredThumbnail;	//	2026/10/28 added
 
 - (void)_threaded_setError:(NSError *)error forNode:(PGNode *)node;
 - (void)_updateThumbnailsOfChildren;
@@ -131,7 +133,118 @@ StringAtDepth(NSInteger depth) {
 static off_t const PGArchiveEntryMaximumByteSize = 512ll << 20;
 static off_t const PGArchiveEntryMaximumThumbnailByteSize = 64ll << 20;
 
+@interface PGResourceAdapter(PGArchiveAdapterThumbnail)
+- (void)_setRealThumbnail:(NSImage *)anImage;
+@end
+
+//	2026/10/28 added: a thumbnail of the first image (by name) of an archive
+//	that hasn't been loaded, made on a background thread with an archive object
+//	of its own so that the film strip doesn't wait for the archive to load
+static NSImage *
+PGThumbnailOfFirstImageInArchive(NSString *path, CGFloat maxPixelSize)
+{
+	XADArchive *const archive = [[XADArchive alloc] initWithFile:path delegate:nil error:NULL];
+	if(!archive) return nil;
+	int first = -1;
+	NSString *firstName = nil;
+	int const count = archive.numberOfEntries;
+	for(int i = 0; i < count; i++) {
+		NSString *const name = [archive nameOfEntry:i];
+		if(!name.length || PG_entryIsInvisibleForName(name) || [archive entryIsDirectory:i] || [archive entryIsEncrypted:i]) continue;
+		if([archive representativeSizeOfEntry:i] > PGArchiveEntryMaximumThumbnailByteSize) continue;
+		if(![[UTType typeWithFilenameExtension:name.pathExtension] conformsToType:UTTypeImage]) continue;
+		if(!firstName || [name localizedStandardCompare:firstName] == NSOrderedAscending) {
+			first = i;
+			firstName = name;
+		}
+	}
+	if(first < 0) return nil;
+	NSData *const data = [archive contentsOfEntry:first];
+	if(!data) return nil;
+	CGImageSourceRef const source = CGImageSourceCreateWithData((__bridge CFDataRef)data, NULL);
+	if(!source) return nil;
+	CGImageRef const thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, (__bridge CFDictionaryRef)@{
+		(id)kCGImageSourceCreateThumbnailFromImageAlways: @YES,
+		(id)kCGImageSourceCreateThumbnailWithTransform: @YES,
+		(id)kCGImageSourceThumbnailMaxPixelSize: @(maxPixelSize)});
+	CFRelease(source);
+	if(!thumbnail) return nil;
+	NSImage *const image = [[NSImage alloc] initWithCGImage:thumbnail size:NSZeroSize];
+	CGImageRelease(thumbnail);
+	return image;
+}
+
 @implementation PGArchiveAdapter
+
+//	MARK: - 2026/10/28 added: archives are loaded when they're needed
+
+- (BOOL)shouldRecursivelyCreateChildren
+{
+	//	archive files in a folder aren't loaded with it: opening one on a
+	//	network volume costs a round trip per entry (RAR headers are spread over
+	//	the file), which made up most of the time to open folders of archives;
+	//	they're loaded when a page is needed (-loadDeferredChildrenIfAllowed),
+	//	when they're clicked in the film strip, or for a bookmark in them.
+	//	Archives in archives are in memory already and are loaded as before
+	PGDataProvider *const dataProvider = self.dataProvider;
+	if(self.parentAdapter && !dataProvider.archive && dataProvider.identifier.isFileIdentifier &&
+	   self.node != [PGResourceAdapter nodeReloadingIgnoringMaxDepth]) {
+		_deferred = YES;
+		self.document.hasDeferredArchives = YES;
+		return NO;
+	}
+	return [super shouldRecursivelyCreateChildren];
+}
+- (void)_loadDeferredArchive
+{
+	_deferred = NO;
+	PGDocumentController *const dc = [PGDocumentController sharedDocumentController];
+	[dc beginLoadingProgressWithName:self.node.identifier.displayName];
+	[PGResourceAdapter reloadNodeIgnoringMaxDepth:self.node];	//	replaces this adapter
+	[dc endLoadingProgress];
+}
+- (BOOL)loadDeferredChildrenIfAllowed
+{
+	if(!_deferred || ![PGResourceAdapter loadsDeferredContainers]) return NO;
+	[self _loadDeferredArchive];
+	return YES;
+}
+- (PGNode *)nodeForIdentifier:(PGResourceIdentifier *)ident
+{
+	//	eg, a bookmark of a page in the archive
+	if(_deferred) for(PGResourceIdentifier *superident = ident.superidentifier; superident; superident = superident.superidentifier) {
+		if(![self.node.identifier isEqual:superident]) continue;
+		PGNode *const node = self.node;
+		[self _loadDeferredArchive];
+		return [node.resourceAdapter nodeForIdentifier:ident];
+	}
+	return [super nodeForIdentifier:ident];
+}
+- (void)generateThumbnailForContainer
+{
+	//	called by -thumbnail when there's no first page to take it from
+	if(!_deferred || _triedDeferredThumbnail) return;
+	_triedDeferredThumbnail = YES;
+	NSString *const path = self.dataProvider.identifier.URL.path;
+	if(!path) return;
+	static dispatch_queue_t queue;
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		queue = dispatch_queue_create("PGArchiveAdapter.thumbnails", DISPATCH_QUEUE_SERIAL);
+	});
+	__weak PGArchiveAdapter *const weakSelf = self;
+	dispatch_async(queue, ^{
+		NSImage *image;
+		@autoreleasepool {
+			image = PGThumbnailOfFirstImageInArchive(path, 256.0f);
+		}
+		if(!image) return;
+		dispatch_async(dispatch_get_main_queue(), ^{
+			PGArchiveAdapter *const strongSelf = weakSelf;
+			if(strongSelf && strongSelf.node.resourceAdapter == strongSelf) [strongSelf _setRealThumbnail:image];
+		});
+	});
+}
 
 //	returns an array containing the child nodes which represent all objects
 //	that are direct children of the given path

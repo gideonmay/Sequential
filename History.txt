@@ -26,6 +26,8 @@
 - Edit > Undo puts images moved to the Trash back and reverts tag changes.
 - View > Two Pages Side by Side (P): two portrait pages are shown together.
 - View > Transition > Ken Burns Effect in Slideshows.
+- archives in a folder are only opened when they're needed (eg, when the
+  next page is in one), so folders of many archives open much faster.
 - folders on network volumes open much faster (the type of a file is
   detected by its name instead of reading the start of every file).
 - the Keyboard Shortcuts help page lists all shortcuts.

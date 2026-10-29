@@ -59,7 +59,8 @@ macOS 27 or later. Changes compared to chuchusoft's 2.6.0:
 - Edit > Undo for Move to Trash and tag changes
 - View > Two Pages Side by Side (P) for comics
 - View > Transition > Ken Burns Effect in Slideshows
-- folders on network volumes open much faster
+- folders on network volumes open much faster; archives in a folder are
+  only opened when they're needed
 - the Keyboard Shortcuts help page lists all shortcuts
 - fixed a crash when pressing a key whose menu shortcut has no target
 

@@ -71,6 +71,10 @@ enum {
 - (PGNode *)selectorForward:(BOOL)flag withContext:(id)context ignored:(id)nil1; */
 
 - (void)noteChildValueForCurrentSortOrderDidChange:(PGNode *)child;
+//	2026/10/28 added: loads a container that wasn't loaded with its folder when
+//	+[PGResourceAdapter loadsDeferredContainers]; YES if it was (the node then
+//	has a new adapter); NO by default
+- (BOOL)loadDeferredChildrenIfAllowed;
 
 @end
 

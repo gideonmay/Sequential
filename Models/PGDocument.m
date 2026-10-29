@@ -462,8 +462,12 @@ NSString *const PGDocumentUpdateRecursivelyKey = @"PGDocumentUpdateRecursively";
 
 - (PGNode *)_initialNode
 {
-	PGNode *const node = [self.node.resourceAdapter nodeForIdentifier:_initialIdentifier];
-	return node ? node : [self.node.resourceAdapter sortedViewableNodeFirst:YES];
+	__block PGNode *node = [self.node.resourceAdapter nodeForIdentifier:_initialIdentifier];
+	//	2026/10/28 eg, the first page is in an archive, which isn't loaded yet
+	if(!node) [PGResourceAdapter performLoadingDeferredContainers:^{
+		node = [self.node.resourceAdapter sortedViewableNodeFirst:YES];
+	}];
+	return node;
 }
 - (void)_setInitialIdentifier:(PGResourceIdentifier *)ident
 {
