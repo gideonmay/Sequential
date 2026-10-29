@@ -194,14 +194,31 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 @property (nonatomic, strong) NSTimer *pageTransitionTimer;	//	2026/10/28 added: renders Core Image transitions
 @property (nonatomic, assign) BOOL pageTransitionPending;	//	2026/10/28 added
 @property (nonatomic, assign) BOOL pageTransitionForward;	//	2026/10/28 added
+@property (nonatomic, strong) NSView *kenBurnsView;	//	2026/10/28 added
+//	2026/10/28 added: two pages side by side (see -nodeReadyForViewing:)
+@property (nonatomic, strong) PGNode *spreadPartner;	//	the second page, while it's read or shown
+@property (nonatomic, strong) NSImageRep *spreadFirstRep;	//	the first page's image while the second is read
+@property (nonatomic, assign) BOOL spreadShown;
+@property (nonatomic, assign) BOOL spreadComposed;	//	the image being shown is the composed spread
+@property (nonatomic, strong) PGNode *spreadForcedPartner;	//	going backwards: the page the spread must end with
+@property (nonatomic, assign) BOOL spreadSuppressed;	//	show the next page alone
+@property (nonatomic, strong) CALayer *kenBurnsLayer;	//	2026/10/28 added
+@property (nonatomic, strong) NSBitmapImageRep *kenBurnsImage;	//	2026/10/28 added
 
 - (NSBitmapImageRep *)_snapshotForPageTransition;	//	2026/10/28 added
 - (void)_runPageTransitionFromSnapshot:(NSBitmapImageRep *)before;	//	2026/10/28 added
 - (void)_endPageTransition;	//	2026/10/28 added
+- (void)_startKenBurnsIfAppropriate;	//	2026/10/28 added
+- (NSBitmapImageRep *)_kenBurnsSnapshot;	//	2026/10/28 added
+- (void)_endKenBurns;	//	2026/10/28 added
+- (BOOL)_spreadsEnabled;	//	2026/10/28 added
+- (BOOL)_isSpreadPage:(PGNode *)node;	//	2026/10/28 added
+- (void)spreadPartnerReadyForViewing:(NSNotification *)aNotif;	//	2026/10/28 added
 - (void)_updateAmbientBackground;	//	2026/10/28 added
 - (void)_moveActiveNodeToTrash;	//	2026/10/28 added
 - (NSURL *)_URLForFinderTags;	//	2026/10/28 added
-- (void)_finderTagsDidChange;	//	2026/10/28 added
+- (BOOL)_nodeMatchesTagFilter:(PGNode *)node;	//	2026/10/28 added
+- (PGNode *)_nodeMatchingTagFilterFrom:(PGNode *)node forward:(BOOL)forward;	//	2026/10/28 added
 - (void)_flashInfoPanel;	//	2026/10/28 added
 - (void)_fadeOutFlashedInfoPanel;	//	2026/10/28 added
 
@@ -262,6 +279,49 @@ static NSBitmapImageRep *PGSnapshotOfView(NSView *view)
 	NSBitmapImageRep *const rep = [view bitmapImageRepForCachingDisplayInRect:bounds];
 	if(!rep) return nil;
 	[view cacheDisplayInRect:bounds toBitmapImageRep:rep];
+	return rep;
+}
+
+//	2026/10/28 added: the size of an image as it's shown
+static NSSize PGOrientedPixelSize(NSImageRep *rep, PGOrientation orientation)
+{
+	NSSize const size = NSMakeSize(rep.pixelsWide, rep.pixelsHigh);
+	return orientation & PGRotated90CCW ? NSMakeSize(size.height, size.width) : size;
+}
+static BOOL PGIsPortrait(NSImageRep *rep, PGOrientation orientation)
+{
+	NSSize const size = PGOrientedPixelSize(rep, orientation);
+	return size.width > 0 && size.height > 0 && size.width < size.height;
+}
+//	2026/10/28 added: two pages side by side at the same height, the first one
+//	on the left (on the right when reading from right to left)
+static NSBitmapImageRep *PGSpreadImageRep(NSImageRep *first, PGOrientation firstOrientation,
+	NSImageRep *second, PGOrientation secondOrientation, BOOL rightToLeft)
+{
+	NSSize const s1 = PGOrientedPixelSize(first, firstOrientation), s2 = PGOrientedPixelSize(second, secondOrientation);
+	CGFloat const h = MIN(MAX(s1.height, s2.height), 8192.0f);
+	CGFloat const w1 = round(s1.width * h / s1.height), w2 = round(s2.width * h / s2.height);
+	NSBitmapImageRep *const rep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL pixelsWide:(NSInteger)(w1 + w2) pixelsHigh:(NSInteger)h
+		bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
+	if(!rep) return nil;
+	rep.size = NSMakeSize(w1 + w2, h);
+	[NSGraphicsContext saveGraphicsState];
+	NSGraphicsContext.currentContext = [NSGraphicsContext graphicsContextWithBitmapImageRep:rep];
+	NSGraphicsContext.currentContext.imageInterpolation = NSImageInterpolationHigh;
+	NSRect const r1 = NSMakeRect(rightToLeft ? w2 : 0.0f, 0.0f, w1, h);
+	NSRect const r2 = NSMakeRect(rightToLeft ? 0.0f : w1, 0.0f, w2, h);
+	NSImageRep *const reps[2] = {first, second};
+	PGOrientation const orientations[2] = {firstOrientation, secondOrientation};
+	NSRect const rects[2] = {r1, r2};
+	for(NSUInteger i = 0; i < 2; i++) {
+		NSRect r = rects[i];
+		NSAffineTransform *const transform = [NSAffineTransform PG_transformWithRect:&r orientation:orientations[i]];
+		[NSGraphicsContext saveGraphicsState];
+		[transform concat];
+		[reps[i] drawInRect:r];
+		[NSGraphicsContext restoreGraphicsState];
+	}
+	[NSGraphicsContext restoreGraphicsState];
 	return rep;
 }
 
@@ -551,20 +611,8 @@ static void PGAddPageTransitionAnimation(CALayer *layer, NSString *keyPath, id f
 }
 - (IBAction)moveToTrash:(id)sender
 {
-	//	2026/10/28 the completion handler runs on an arbitrary queue, so the nodes
-	//	are removed on the main queue; the beep was decided before it had run
-	NSArray<PGNode *> *const nodes = self.selectedNodes.allObjects;
-	NSMutableArray<NSURL *> *const URLs = [NSMutableArray array];
-	for(PGNode *const node in nodes)
-		if(node.identifier.isFileIdentifier && node.identifier.URL) [URLs addObject:node.identifier.URL];
-	if(!URLs.count) return NSBeep();
-	[NSWorkspace.sharedWorkspace recycleURLs:URLs completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
-		dispatch_async(dispatch_get_main_queue(), ^{
-			if(error) NSBeep();
-			for(PGNode *const node in nodes)
-				if(node.identifier.URL && newURLs[node.identifier.URL]) [node removeFromDocument];
-		});
-	}];
+	//	2026/10/28 moved to PGDocument (so that it can be undone)
+	[self.activeDocument moveNodesToTrash:self.selectedNodes.allObjects];
 }
 
 //	2026/10/28 added: Finder tags (see PGFinderTagsOfURL())
@@ -603,14 +651,22 @@ PGFinderTagImage(NSColor *color)
 	NSUInteger const i = PGIndexOfFinderTagNamed(tags, labels[label]);
 	if(NSNotFound != i) [tags removeObjectAtIndex:i];
 	else [tags addObject:[NSString stringWithFormat:@"%@\n%ld", labels[label], (long)label]];
-	if(!PGSetFinderTagsOfURL(URL, tags)) return NSBeep();
-	[self _finderTagsDidChange];
+	NSString *const actionName = [NSString stringWithFormat:NSNotFound != i ?
+		NSLocalizedString(@"Remove %@ Tag", @"Undo action name; %@ is the tag's name.") :
+		NSLocalizedString(@"Add %@ Tag", @"Undo action name; %@ is the tag's name."), labels[label]];
+	if(![self.activeDocument setFinderTags:tags ofNode:self.activeNode actionName:actionName]) NSBeep();
 }
 - (IBAction)removeFinderTags:(id)sender	//	2026/10/28 added
 {
-	NSURL *const URL = [self _URLForFinderTags];
-	if(!URL || !PGSetFinderTagsOfURL(URL, @[])) return NSBeep();
-	[self _finderTagsDidChange];
+	if(![self _URLForFinderTags] || ![self.activeDocument setFinderTags:@[] ofNode:self.activeNode
+		actionName:NSLocalizedString(@"Remove All Tags", @"Undo action name.")]) NSBeep();
+}
+- (void)noteFinderTagsDidChangeForNode:(PGNode *)node	//	2026/10/28 added
+{
+	//	the thumbnail has been updated by the document
+	if(node != self.activeNode) return;
+	[self _updateInfoPanelText];
+	[self _flashInfoPanel];
 }
 
 //	MARK: -
@@ -1119,6 +1175,9 @@ PGFinderTagImage(NSColor *color)
 		_nextTimerFireDate = nil;
 		_timer = nil;
 	}
+	//	2026/10/28 the Ken Burns effect only runs during the slideshow
+	if(run) [self _startKenBurnsIfAppropriate];
+	else [self _endKenBurns];
 	[self PG_postNotificationName:PGDisplayControllerTimerDidChangeNotification];
 }
 
@@ -1284,9 +1343,68 @@ PGFinderTagImage(NSColor *color)
 }
 - (BOOL)tryToGoForward:(BOOL)forward allowAlerts:(BOOL)flag
 {
-	if([self tryToSetActiveNode:[self.activeNode.resourceAdapter sortedViewableNodeNext:forward] forward:forward]) return YES;
+	//	2026/10/28 two pages side by side: forwards, the page after the second one;
+	//	backwards, the spread that ends with the previous page (decided when the
+	//	pages have been read, see -nodeReadyForViewing:)
+	PGNode *const from = forward && _spreadShown && _spreadPartner ? _spreadPartner : self.activeNode;
+	if(self._spreadsEnabled) {
+		if(!forward) {
+			PGNode *const previous = [self _nodeMatchingTagFilterFrom:[self.activeNode.resourceAdapter sortedViewableNodeNext:NO] forward:NO];
+			PGNode *const beforePrevious = previous ? [self _nodeMatchingTagFilterFrom:[previous.resourceAdapter sortedViewableNodeNext:NO] forward:NO] : nil;
+			if(previous && [self _isSpreadPage:previous]) {
+				if(beforePrevious && [self _isSpreadPage:beforePrevious] && beforePrevious.parentNode == previous.parentNode) _spreadForcedPartner = previous;
+				else _spreadSuppressed = YES;
+				[self setActiveNode:_spreadForcedPartner ? beforePrevious : previous forward:NO];
+				return YES;
+			}
+		}
+	}
+	//	2026/10/28 pages that don't have the tag of the tag filter are skipped
+	if([self tryToSetActiveNode:[self _nodeMatchingTagFilterFrom:[from.resourceAdapter sortedViewableNodeNext:forward] forward:forward] forward:forward]) return YES;
 	[self prepareToLoop];
-	return [self tryToLoopForward:forward toNode:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:forward] pageForward:forward allowAlerts:flag];
+	return [self tryToLoopForward:forward toNode:[self _nodeMatchingTagFilterFrom:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:forward] forward:forward] pageForward:forward allowAlerts:flag];
+}
+- (BOOL)_nodeMatchesTagFilter:(PGNode *)node	//	2026/10/28 added
+{
+	NSInteger const filter = self.activeDocument.tagFilter;
+	if(!filter) return YES;
+	if(!node.identifier.isFileIdentifier) return NO;
+	NSArray<NSNumber *> *const labels = node.identifier.tagLabels;
+	return PGAnyTagFilter == filter ? labels.count > 0 : [labels containsObject:@(filter)];
+}
+- (PGNode *)_nodeMatchingTagFilterFrom:(PGNode *)node forward:(BOOL)forward	//	2026/10/28 added
+{
+	//	the node itself or the next one that matches; pages in archives and PDFs
+	//	can't have tags, so such a file is skipped at once instead of page by page
+	while(node && ![self _nodeMatchesTagFilter:node]) {
+		PGNode *file = node;
+		while(file && !file.identifier.isFileIdentifier) file = file.parentNode;
+		if(file && file != node && file != self.activeDocument.node)
+			node = [file.resourceAdapter sortedViewableNodeNext:forward includeChildren:NO];
+		else if(file == node)
+			node = [node.resourceAdapter sortedViewableNodeNext:forward];
+		else
+			return nil;	//	the document is an archive or PDF
+	}
+	return node;
+}
+- (IBAction)changeTagFilter:(id)sender	//	2026/10/28 added
+{
+	//	shows the first matching page (from the current one); with no matching
+	//	pages, the filter isn't turned on
+	PGDocument *const doc = self.activeDocument;
+	NSInteger const previousFilter = doc.tagFilter;
+	doc.tagFilter = [sender tag];
+	if(![self _nodeMatchesTagFilter:self.activeNode]) {
+		PGNode *match = [self _nodeMatchingTagFilterFrom:[self.activeNode.resourceAdapter sortedViewableNodeNext:YES] forward:YES];
+		if(!match) match = [self _nodeMatchingTagFilterFrom:[doc.node.resourceAdapter sortedViewableNodeFirst:YES] forward:YES];
+		if(match) [self setActiveNode:match forward:YES];
+		else {
+			doc.tagFilter = previousFilter;
+			NSBeep();
+		}
+	}
+	[self _updateInfoPanelText];
 }
 - (void)loopForward:(BOOL)flag
 {
@@ -1415,9 +1533,14 @@ PGFinderTagImage(NSColor *color)
 
 //	MARK: - notification handlers
 
+- (void)clipViewBoundsDidChange:(NSNotification *)aNotif	//	2026/10/28 added
+{
+	[self _endKenBurns];	//	scrolled or zoomed
+}
 - (void)clipViewFrameDidChange:(NSNotification *)aNotif
 {
 	[self _endPageTransition];	//	2026/10/28 added
+	[self _endKenBurns];	//	2026/10/28 added
 	[self _updateImageViewSizeAllowAnimation:NO];
 }
 
@@ -1431,8 +1554,34 @@ PGFinderTagImage(NSColor *color)
 - (void)nodeReadyForViewing:(NSNotification *)aNotif
 {
 	NSParameterAssert([aNotif object] == [self activeNode]);
-	NSBitmapImageRep *const transitionSnapshot = [self _snapshotForPageTransition];	//	2026/10/28 added
+	//	2026/10/28 two pages side by side: a portrait page is shown with the next
+	//	one when that's also a portrait image in the same folder; that page is
+	//	read first, and the two are then shown as one image
 	NSError *const error = self.activeNode.resourceAdapter.error;
+	PGNode *const forcedPartner = _spreadForcedPartner;
+	BOOL const suppressed = _spreadSuppressed;
+	_spreadForcedPartner = nil;
+	_spreadSuppressed = NO;
+	if(!error && !_spreadComposed && !suppressed && self._spreadsEnabled) {
+		NSImageRep *const rep = aNotif.userInfo[PGImageRepKey];
+		BOOL const portrait = rep && PGIsPortrait(rep, [self.activeNode.resourceAdapter orientationWithBase:YES]);
+		if(forcedPartner && !portrait) {
+			//	going backwards to a page that can't be paired: show it alone
+			_spreadSuppressed = YES;
+			[self setActiveNode:forcedPartner forward:NO];
+			return;
+		}
+		PGNode *const partner = forcedPartner ? forcedPartner : [self _nodeMatchingTagFilterFrom:[self.activeNode.resourceAdapter sortedViewableNodeNext:YES] forward:YES];
+		if(portrait && partner && [self _isSpreadPage:partner] && partner.parentNode == self.activeNode.parentNode) {
+			_spreadFirstRep = rep;
+			_spreadPartner = partner;
+			_spreadForcedPartner = forcedPartner;	//	for -spreadPartnerReadyForViewing:
+			[partner PG_addObserver:self selector:@selector(spreadPartnerReadyForViewing:) name:PGNodeReadyForViewingNotification];
+			[partner becomeViewed];
+			return;
+		}
+	}
+	NSBitmapImageRep *const transitionSnapshot = [self _snapshotForPageTransition];	//	2026/10/28 added
 	if(!error) {
 #if __has_feature(objc_arc)
 		NSPoint const relativeCenter = _clipView.relativeCenter;
@@ -1440,7 +1589,8 @@ PGFinderTagImage(NSColor *color)
 		NSPoint const relativeCenter = [clipView relativeCenter];
 #endif
 		NSImageRep *const rep = aNotif.userInfo[PGImageRepKey];
-		PGOrientation const orientation = [self.activeNode.resourceAdapter orientationWithBase:YES];
+		//	2026/10/28 the composed spread is upright already
+		PGOrientation const orientation = _spreadComposed ? PGUpright : [self.activeNode.resourceAdapter orientationWithBase:YES];
 		[_imageView setImageRep:rep
 					orientation:orientation
 						   size:[self _sizeForImageRep:rep orientation:orientation]];
@@ -1453,6 +1603,7 @@ PGFinderTagImage(NSColor *color)
 		[self.window makeFirstResponder:_clipView];
 		[self _updateAmbientBackground];	//	2026/10/28 added
 		[self _runPageTransitionFromSnapshot:transitionSnapshot];	//	2026/10/28 added
+		if(!_pageTransitionView) [self _startKenBurnsIfAppropriate];	//	2026/10/28 added; else when it ends
 #else
 		[clipView setDocumentView:_imageView];
 		if(PGPreserveLocation == _initialLocation)
@@ -1499,8 +1650,61 @@ PGFinderTagImage(NSColor *color)
 	}
 	if(!_imageView.superview) [_imageView setImageRep:nil orientation:PGUpright size:NSZeroSize];
 	if(_clipView.documentView != _imageView) _clipView.ambientImage = nil;	//	2026/10/28 eg, an error
+	_spreadComposed = NO;	//	2026/10/28 added
+	[self _updateInfoPanelText];	//	2026/10/28 added (shows both pages' names)
 	[self _readFinished];
 	[_thumbnailController clipViewBoundsDidChange:nil];
+}
+- (void)spreadPartnerReadyForViewing:(NSNotification *)aNotif	//	2026/10/28 added
+{
+	PGNode *const partner = aNotif.object;
+	[partner PG_removeObserver:self name:PGNodeReadyForViewingNotification];
+	if(partner != _spreadPartner || !_spreadFirstRep) return;	//	another page is shown meanwhile
+	NSImageRep *const firstRep = _spreadFirstRep;
+	PGNode *const forcedPartner = _spreadForcedPartner;
+	_spreadFirstRep = nil;
+	_spreadForcedPartner = nil;
+	NSImageRep *const secondRep = partner.resourceAdapter.error ? nil : aNotif.userInfo[PGImageRepKey];
+	PGOrientation const secondOrientation = [partner.resourceAdapter orientationWithBase:YES];
+	NSImageRep *rep = nil;
+	if(secondRep && PGIsPortrait(secondRep, secondOrientation)) {
+		BOOL const rightToLeft = PGReadingDirectionRightToLeft == self.activeDocument.readingDirection;
+		rep = PGSpreadImageRep(firstRep, [self.activeNode.resourceAdapter orientationWithBase:YES], secondRep, secondOrientation, rightToLeft);
+	}
+	if(!rep && forcedPartner) {
+		//	going backwards to a page that can't be paired: show it alone
+		_spreadPartner = nil;
+		_spreadSuppressed = YES;
+		[self setActiveNode:forcedPartner forward:NO];
+		return;
+	}
+	_spreadShown = rep != nil;
+	if(!rep) _spreadPartner = nil;
+	_spreadComposed = rep != nil;
+	_spreadSuppressed = !rep;	//	shown alone, so it isn't paired again
+	[self nodeReadyForViewing:[NSNotification notificationWithName:PGNodeReadyForViewingNotification object:self.activeNode
+		userInfo:@{PGImageRepKey: rep ? rep : firstRep}]];
+}
+- (BOOL)_spreadsEnabled	//	2026/10/28 added
+{
+	return [[NSUserDefaults standardUserDefaults] boolForKey:PGTwoPageSpreadKey];
+}
+- (BOOL)_isSpreadPage:(PGNode *)node	//	2026/10/28 added
+{
+	return node.isViewable && [node.resourceAdapter isKindOfClass:[PGGenericImageAdapter class]];
+}
+- (IBAction)toggleTwoPageSpread:(id)sender	//	2026/10/28 added
+{
+	NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];
+	[d setBool:![d boolForKey:PGTwoPageSpreadKey] forKey:PGTwoPageSpreadKey];
+	//	shows the current page again, with or without the next one
+	[_spreadPartner PG_removeObserver:self name:PGNodeReadyForViewingNotification];
+	_spreadPartner = nil;
+	_spreadFirstRep = nil;
+	_spreadShown = NO;
+	[_activeNode PG_removeObserver:self name:PGNodeLoadingDidProgressNotification];
+	[_activeNode PG_removeObserver:self name:PGNodeReadyForViewingNotification];
+	if(_activeNode) [self _readActiveNode];
 }
 
 //	MARK: -
@@ -1688,6 +1892,10 @@ PGFinderTagImage(NSColor *color)
 	BOOL const pending = _pageTransitionPending;
 	_pageTransitionPending = NO;
 	[self _endPageTransition];
+	//	the outgoing page as the Ken Burns effect shows it at this moment, or
+	//	it would jump back to its normal size when the transition starts
+	NSBitmapImageRep *const kenBurnsSnapshot = pending ? [self _kenBurnsSnapshot] : nil;
+	[self _endKenBurns];
 	if(!pending) return nil;
 	NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];
 	if(PGNoPageTransition == [d integerForKey:PGPageTransitionStyleKey] ||
@@ -1697,7 +1905,7 @@ PGFinderTagImage(NSColor *color)
 	//	snapshots are drawn without layer filters, so they would
 	//	flash un-inverted colors while Invert Colors is on
 	if(_imageView.wantsLayer) return nil;
-	return PGSnapshotOfView(_clipView);
+	return kenBurnsSnapshot ? kenBurnsSnapshot : PGSnapshotOfView(_clipView);
 }
 - (void)_runPageTransitionFromSnapshot:(NSBitmapImageRep *)before	//	2026/10/28 added
 {
@@ -1748,7 +1956,10 @@ PGFinderTagImage(NSColor *color)
 	__weak NSView *const weakView = view;
 	void (^const finish)(void) = ^{
 		PGDisplayController *const strongSelf = weakSelf;
-		if(strongSelf && strongSelf.pageTransitionView == weakView) [strongSelf _endPageTransition];
+		if(strongSelf && strongSelf.pageTransitionView == weakView) {
+			[strongSelf _endPageTransition];
+			[strongSelf _startKenBurnsIfAppropriate];	//	2026/10/28 added
+		}
 	};
 	if(usesFilter) {
 		//	rendered frame by frame (a CATransition with a Core Image filter
@@ -2137,12 +2348,7 @@ PGFinderTagImage(NSColor *color)
 	//	restart the countdown now; moving to the Trash can take a while (eg, on
 	//	slow volumes) and the timer would otherwise keep counting down meanwhile
 	if(self.timerRunning) self.timerRunning = YES;
-	[[NSWorkspace sharedWorkspace] recycleURLs:@[URL] completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
-		dispatch_async(dispatch_get_main_queue(), ^{
-			if(error || !newURLs[URL]) return NSBeep();
-			[node removeFromDocument];
-		});
-	}];
+	[self.activeDocument moveNodesToTrash:@[node]];	//	can be undone
 }
 - (NSURL *)_URLForFinderTags	//	2026/10/28 added
 {
@@ -2150,15 +2356,6 @@ PGFinderTagImage(NSColor *color)
 	PGNode *const node = self.activeNode;
 	PGResourceIdentifier *const ident = node.identifier;
 	return ident.isFileIdentifier && node.isViewable ? ident.URL : nil;
-}
-- (void)_finderTagsDidChange	//	2026/10/28 added
-{
-	//	the info bubble and the thumbnail show the new tags
-	PGNode *const node = self.activeNode;
-	[node.identifier noteFinderTagsDidChange];
-	[self.activeDocument noteNodeThumbnailDidChange:node recursively:NO];
-	[self _updateInfoPanelText];
-	[self _flashInfoPanel];
 }
 - (void)_flashInfoPanel	//	2026/10/28 added
 {
@@ -2180,6 +2377,90 @@ PGFinderTagImage(NSColor *color)
 	BOOL const show = PGAmbientBackground == [[NSUserDefaults standardUserDefaults] integerForKey:PGBackgroundStyleKey] &&
 		_clipView.documentView == _imageView && _imageView.rep && !_imageView.wantsLayer;
 	_clipView.ambientImage = show ? PGAmbientImageOf(_imageView.rep, _imageView.orientation) : nil;
+}
+- (void)_startKenBurnsIfAppropriate	//	2026/10/28 added
+{
+	//	a slow zoom (by 10%) towards a random point of a snapshot of the page,
+	//	during the slideshow; it lasts until the next page is shown
+	if(_kenBurnsView || _pageTransitionView || !self.timerRunning) return;
+	if(![[NSUserDefaults standardUserDefaults] boolForKey:PGKenBurnsKey]) return;
+	if(_clipView.documentView != _imageView || !_imageView.rep || self.isReading) return;
+	if(_imageView.wantsLayer) return;	//	Invert Colors (snapshots aren't inverted)
+	if(_imageView.canAnimateRep && self.activeDocument.animatesImages) return;
+	NSView *const superview = _clipView.superview;
+	NSBitmapImageRep *const image = PGSnapshotOfView(_clipView);
+	if(!superview || !image) return;
+
+	PGPageTransitionView *const view = [[PGPageTransitionView alloc] initWithFrame:_clipView.frame];
+	CALayer *const root = [CALayer layer];
+	root.masksToBounds = YES;
+	view.layer = root;
+	view.wantsLayer = YES;
+	CALayer *const layer = [CALayer layer];
+	layer.frame = NSRectToCGRect(view.bounds);
+	layer.contentsScale = self.window.backingScaleFactor;
+	layer.contents = (__bridge id)image.CGImage;
+	[root addSublayer:layer];
+	[superview addSubview:view positioned:NSWindowAbove relativeTo:_clipView];
+	_kenBurnsView = view;
+	_kenBurnsLayer = layer;
+	_kenBurnsImage = image;
+
+	//	the zoomed page always covers the view: it moves by at most the amount
+	//	by which it has grown on each side
+	CGFloat const zoom = 1.1f;
+	CGFloat const maxX = (zoom - 1.0f) * NSWidth(view.bounds) / 2.0f;
+	CGFloat const maxY = (zoom - 1.0f) * NSHeight(view.bounds) / 2.0f;
+	CGFloat const angle = arc4random_uniform(360) * M_PI / 180.0;
+	CATransform3D const end = CATransform3DMakeAffineTransform(CGAffineTransformMake(zoom, 0.0f, 0.0f, zoom,
+		maxX * cos(angle), maxY * sin(angle)));
+	NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];
+	CFTimeInterval const transition = PGNoPageTransition == [d integerForKey:PGPageTransitionStyleKey] ? 0.0 : [d integerForKey:PGPageTransitionDurationKey] / 1000.0;
+	CABasicAnimation *const animation = [CABasicAnimation animationWithKeyPath:@"transform"];
+	animation.fromValue = [NSValue valueWithCATransform3D:CATransform3DIdentity];
+	animation.toValue = [NSValue valueWithCATransform3D:end];
+	animation.duration = MAX(1.0, self.activeDocument.timerInterval + transition);
+	animation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
+	layer.transform = end;
+	[layer addAnimation:animation forKey:@"kenBurns"];
+}
+- (NSBitmapImageRep *)_kenBurnsSnapshot	//	2026/10/28 added
+{
+	//	draws the snapshot with the transform the effect has reached
+	if(!_kenBurnsLayer || !_kenBurnsImage) return nil;
+	CALayer *const presentation = _kenBurnsLayer.presentationLayer;
+	CGAffineTransform const t = CATransform3DGetAffineTransform(presentation ? presentation.transform : _kenBurnsLayer.transform);
+	NSBitmapImageRep *const image = _kenBurnsImage;
+	NSInteger const w = image.pixelsWide, h = image.pixelsHigh;
+	CGFloat const scale = w / MAX(1.0f, image.size.width);
+	NSBitmapImageRep *const rep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL pixelsWide:w pixelsHigh:h
+		bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
+	if(!rep) return nil;
+	rep.size = image.size;
+	NSGraphicsContext *const context = [NSGraphicsContext graphicsContextWithBitmapImageRep:rep];
+	CGContextRef const ctx = context.CGContext;
+	CGContextTranslateCTM(ctx, w / 2.0f, h / 2.0f);
+	CGContextConcatCTM(ctx, CGAffineTransformMake(t.a, t.b, t.c, t.d, t.tx * scale, t.ty * scale));
+	CGContextTranslateCTM(ctx, -w / 2.0f, -h / 2.0f);
+	CGContextSetInterpolationQuality(ctx, kCGInterpolationHigh);
+	CGContextDrawImage(ctx, CGRectMake(0.0f, 0.0f, w, h), image.CGImage);
+	CGContextFlush(ctx);
+	return rep;
+}
+- (void)_endKenBurns	//	2026/10/28 added
+{
+	[_kenBurnsView removeFromSuperview];
+	_kenBurnsView = nil;
+	_kenBurnsLayer = nil;
+	_kenBurnsImage = nil;
+}
+- (IBAction)toggleKenBurns:(id)sender	//	2026/10/28 added
+{
+	NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];
+	BOOL const on = ![d boolForKey:PGKenBurnsKey];
+	[d setBool:on forKey:PGKenBurnsKey];
+	if(on) [self _startKenBurnsIfAppropriate];
+	else [self _endKenBurns];
 }
 - (void)_endPageTransition	//	2026/10/28 added
 {
@@ -2217,6 +2498,11 @@ PGFinderTagImage(NSColor *color)
 	if(aNode == _activeNode) return NO;
 	[_activeNode PG_removeObserver:self name:PGNodeLoadingDidProgressNotification];
 	[_activeNode PG_removeObserver:self name:PGNodeReadyForViewingNotification];
+	//	2026/10/28 a spread ends with the page; its partner's read still finishes
+	[_spreadPartner PG_removeObserver:self name:PGNodeReadyForViewingNotification];
+	_spreadPartner = nil;
+	_spreadFirstRep = nil;
+	_spreadShown = NO;
 #if __has_feature(objc_arc)
 	_activeNode = aNode;
 #else
@@ -2421,6 +2707,15 @@ PGFinderTagImage(NSColor *color)
 		PGNode *const parent = node.parentNode;
 		if(parent.parentNode) text = [NSString stringWithFormat:@"%@ %C %@", parent.identifier.displayName, (unichar)0x25B8, text];
 	} else text = NSLocalizedString(@"No image", @"Label for when no image is being displayed in the window.");
+	//	2026/10/28 two pages side by side
+	if(node && _spreadShown && _spreadPartner) text = [text stringByAppendingFormat:@" + %@", _spreadPartner.identifier.displayName];
+	//	2026/10/28 a filtered slideshow shouldn't look like one that skips images
+	NSInteger const tagFilter = self.activeDocument.tagFilter;
+	NSArray<NSString *> *const labels = NSWorkspace.sharedWorkspace.fileLabels;
+	if(PGAnyTagFilter == tagFilter)
+		text = [text stringByAppendingFormat:@"  %@", NSLocalizedString(@"(tagged only)", @"Info bubble suffix when only tagged images are shown.")];
+	else if(tagFilter > 0 && tagFilter < (NSInteger)labels.count)
+		text = [text stringByAppendingFormat:@"  %@", [NSString stringWithFormat:NSLocalizedString(@"(%@ only)", @"Info bubble suffix when only images with a tag are shown; %@ is the tag's name."), labels[tagFilter]]];
 	((PGInfoView *)_infoPanel.contentView).stringValue = text;
 
 	//	2026/10/28 the image's Finder tags that have a color; they're reread so
@@ -2474,6 +2769,7 @@ PGFinderTagImage(NSColor *color)
 	_clipView.cursor = [NSCursor openHandCursor];
 	[_clipView setPostsFrameChangedNotifications:YES];
 	[_clipView PG_addObserver:self selector:@selector(clipViewFrameDidChange:) name:NSViewFrameDidChangeNotification];
+	[_clipView PG_addObserver:self selector:@selector(clipViewBoundsDidChange:) name:PGClipViewBoundsDidChangeNotification];	//	2026/10/28 added
 #else
 	[clipView setAcceptsFirstResponder:YES];
 	NSImage *const cursorImage = [NSImage imageNamed:@"Cursor-Hand-Pointing"];
@@ -2701,7 +2997,19 @@ PGFinderTagImage(NSColor *color)
 		if(!canAnimate) return NO;
 	}
 	if(@selector(toggleColorInversion:) == action) anItem.state = self.imageView.wantsLayer;
+	if(@selector(toggleTwoPageSpread:) == action) anItem.state = self._spreadsEnabled;	//	2026/10/28 added
+	if(@selector(toggleKenBurns:) == action) anItem.state = [[NSUserDefaults standardUserDefaults] boolForKey:PGKenBurnsKey];	//	2026/10/28 added
 	if(@selector(changeBackgroundStyle:) == action) anItem.state = [[NSUserDefaults standardUserDefaults] integerForKey:PGBackgroundStyleKey] == tag;
+	if(@selector(changeTagFilter:) == action) {	//	2026/10/28 added
+		NSArray<NSString *> *const labels = NSWorkspace.sharedWorkspace.fileLabels;
+		NSArray<NSColor *> *const colors = NSWorkspace.sharedWorkspace.fileLabelColors;
+		if(tag > 0 && tag < (NSInteger)labels.count && tag < (NSInteger)colors.count) {
+			anItem.title = labels[tag];
+			anItem.image = PGFinderTagImage(colors[tag]);
+		}
+		anItem.state = self.activeDocument.tagFilter == tag;
+		return self.activeDocument != nil;
+	}
 	if(@selector(toggleFinderTag:) == action || @selector(removeFinderTags:) == action) {	//	2026/10/28 added
 		NSURL *const URL = [self _URLForFinderTags];
 		if(@selector(removeFinderTags:) == action) return URL != nil;
@@ -2898,6 +3206,10 @@ PGFinderTagImage(NSColor *color)
 
 //	MARK: -
 
+- (NSUndoManager *)windowWillReturnUndoManager:(NSWindow *)window	//	2026/10/28 added
+{
+	return self.activeDocument.undoManager;
+}
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
 #if __has_feature(objc_arc)

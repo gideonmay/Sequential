@@ -22,6 +22,12 @@
   archives show their first page.
 - "Open in Sequential" service for folders, PDFs and archives in the Finder.
 - the Open panel is shown at launch when nothing else is opened.
+- View > Tag Filter (Control-Option-1 to 8): show only images with a tag.
+- Edit > Undo puts images moved to the Trash back and reverts tag changes.
+- View > Two Pages Side by Side (P): two portrait pages are shown together.
+- View > Transition > Ken Burns Effect in Slideshows.
+- folders on network volumes open much faster (the type of a file is
+  detected by its name instead of reading the start of every file).
 - the Keyboard Shortcuts help page lists all shortcuts.
 - security: fixes for memory-safety bugs in the RAR decoder, fewer archive
   formats are parsed, size limits when extracting, no external XML entities,

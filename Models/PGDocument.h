@@ -42,6 +42,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 // Other Sources
 #import "PGGeometryTypes.h"
 
+#define PGAnyTagFilter (-1)	//	2026/10/28 added: any Finder tag with a color
+
 extern NSString *const PGDocumentWillRemoveNodesNotification;
 extern NSString *const PGDocumentSortedNodesDidChangeNotification;
 extern NSString *const PGDocumentNodeIsViewableDidChangeNotification;
@@ -108,6 +110,12 @@ extern NSString *const PGDocumentUpdateRecursivelyKey;
 - (void)createUI;
 - (void)close;
 - (void)openBookmark:(PGBookmark *)aBookmark;
+
+//	2026/10/28 added: changes to the files that can be undone with Edit > Undo
+@property (readonly) NSUndoManager *undoManager;
+@property (nonatomic, assign) NSInteger tagFilter;	//	2026/10/28 added: the label number of the Finder tag the pages must have, PGAnyTagFilter, or 0 (not saved)
+- (void)moveNodesToTrash:(NSArray<PGNode *> *)nodes;	//	files on disk only; beeps if there are none
+- (BOOL)setFinderTags:(NSArray<NSString *> *)tags ofNode:(PGNode *)node actionName:(NSString *)actionName;
 
 - (void)noteNode:(PGNode *)node willRemoveNodes:(NSArray *)anArray;
 - (void)noteSortedChildrenDidChange;

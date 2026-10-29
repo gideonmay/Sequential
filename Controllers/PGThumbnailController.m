@@ -498,6 +498,10 @@ NSString *const PGThumbnailControllerContentInsetDidChangeNotification = @"PGThu
 
 //	MARK: - <NSWindowDelegate>
 
+- (NSUndoManager *)windowWillReturnUndoManager:(NSWindow *)window	//	2026/10/28 added
+{
+	return self.document.undoManager;
+}
 - (void)windowDidBecomeKey:(NSNotification *)aNotif
 {
 	[self.displayController thumbnailPanelDidBecomeKey:aNotif];
@@ -676,15 +680,7 @@ static NSArray<NSURL *> *PGFileURLsOfNodes(NSArray<PGNode *> *nodes, BOOL neares
 }
 - (IBAction)_moveToTrash:(NSMenuItem *)sender
 {
-	NSArray<PGNode *> *const nodes = sender.representedObject;
-	NSArray<NSURL *> *const URLs = PGFileURLsOfNodes(nodes, NO);
-	[[NSWorkspace sharedWorkspace] recycleURLs:URLs completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
-		dispatch_async(dispatch_get_main_queue(), ^{
-			if(error) NSBeep();
-			for(PGNode *const node in nodes)
-				if(newURLs[PGFileURLOfNode(node)]) [node removeFromDocument];
-		});
-	}];
+	[self.document moveNodesToTrash:sender.representedObject];	//	2026/10/28 can be undone
 }
 - (void)_showFirstViewableNodeInNode:(PGNode *)node	//	2026/10/28 added
 {

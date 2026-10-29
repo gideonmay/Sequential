@@ -150,6 +150,10 @@
 				<td>Play/pause animated images</td>
 				<td>M</td>
 			</tr>
+			<tr>
+				<td>Two pages side by side (View &gt; Two Pages Side by Side)</td>
+				<td>P</td>
+			</tr>
 			<tr class="header">
 				<td>Scaling</td>
 				<td>Shortcut</td>
@@ -294,6 +298,18 @@
 				<td>Remove all tags</td>
 				<td>Control-0</td>
 			</tr>
+			<tr>
+				<td>Show only images with the Red, Orange, Yellow, Green, Blue, Purple or Gray tag (View &gt; Tag Filter)</td>
+				<td>Control-Option-1 to Control-Option-7</td>
+			</tr>
+			<tr>
+				<td>Show only images with any tag</td>
+				<td>Control-Option-8</td>
+			</tr>
+			<tr>
+				<td>Show all images again</td>
+				<td>Control-Option-0</td>
+			</tr>
 			<tr class="header">
 				<td>Window</td>
 				<td>Shortcut</td>
@@ -339,6 +355,10 @@
 				<td>Command-Shift-Option-D</td>
 			</tr>
 			<tr>
+				<td>Undo/redo moving to the Trash or changing tags</td>
+				<td>Command-Z, Command-Shift-Z</td>
+			</tr>
+			<tr>
 				<td>Move image to trash</td>
 				<td>Command-Delete</td>
 			</tr>
@@ -374,7 +394,15 @@
 		<h2>Finder tags</h2>
 		<p>Control-1 to Control-7 add a tag to the image that is shown; pressing the key again removes the tag. The tags are named and colored as in the Finder's settings (renamed tags keep their new name), and the image's other tags are kept. The tags are also in File &gt; Tags, which shows the tags the image has. The info bubble (I) shows the image's colored tags as dots after its name; when the bubble is hidden, it appears for a moment when a tag changes. The thumbnails (T) show the tags as dots in their top right corner; tags changed in the Finder are shown when the image is viewed.</p>
 		<p>Only images that are files on disk can be tagged, not images in archives or PDF pages. If Control-1 to Control-7 switch to another desktop instead, turn off Switch to Desktop in System Settings &gt; Keyboard &gt; Keyboard Shortcuts &gt; Mission Control.</p>
+		<h2>Tag filter</h2>
+		<p>View &gt; Tag Filter shows only the images that have a tag: the previous and next page commands and the Timer skip the other images. The info bubble shows the filter after the image's name, eg, "(Red only)". Images in archives and PDF pages can't have tags, so an archive is skipped as a whole. When no image has the tag, the filter isn't turned on. The filter is not saved.</p>
+		<h2>Undo</h2>
+		<p>Edit &gt; Undo puts an image that was moved to the Trash back in its folder and shows it, or reverts a change of its tags. Each window has its own undo history. An image can't be put back when it has been removed from the Trash or when a file with its name has been created meanwhile.</p>
+		<h2>Two pages side by side</h2>
+		<p>With View &gt; Two Pages Side by Side (P), a portrait image is shown with the next image when that is also a portrait image in the same folder, eg, the pages of a comic. Wide images are shown alone. The first page is on the left, or on the right when reading from right to left (View &gt; Right to Left). The next and previous page commands and the Timer move by two pages; going back shows the two pages before the current ones. The page number, the info bubble, the tags and Delete refer to the first of the two pages.</p>
+		<h2>Ken Burns effect</h2>
+		<p>With View &gt; Transition &gt; Ken Burns Effect in Slideshows, each image slowly zooms in towards a random point while the Timer runs. It stops when the image is zoomed, scrolled or the window is resized, and when the Timer stops. It isn't used for animated images or while Invert Colors is on.</p>
 		<h2>Menu commands without a shortcut</h2>
-		<p>View &gt; Transition (the page transition and its speed), View &gt; Folder Depth (how many levels of subfolders are included), View &gt; Background (Ambient, Black or the Settings color). The Finder's Services menu and Quick Actions have Open in Sequential for folders, PDFs and archives.</p>
+		<p>View &gt; Transition (the page transition and its speed, and the Ken Burns effect), View &gt; Folder Depth (how many levels of subfolders are included), View &gt; Background (Ambient, Black or the Settings color). The Finder's Services menu and Quick Actions have Open in Sequential for folders, PDFs and archives.</p>
 	</body>
 </html>

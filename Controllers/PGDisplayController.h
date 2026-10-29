@@ -103,6 +103,7 @@ extern NSString *const PGDisplayControllerTimerDidChangeNotification;
 - (IBAction)moveToTrash:(id)sender;
 - (IBAction)toggleFinderTag:(id)sender;	//	2026/10/28 added; the sender's tag is the label number
 - (IBAction)removeFinderTags:(id)sender;	//	2026/10/28 added
+- (void)noteFinderTagsDidChangeForNode:(PGNode *)node;	//	2026/10/28 added
 
 - (IBAction)copy:(id)sender;
 - (IBAction)selectAll:(id)sender;
@@ -122,8 +123,11 @@ extern NSString *const PGDisplayControllerTimerDidChangeNotification;
 - (IBAction)toggleAnimation:(id)sender;
 - (IBAction)changePageTransitionStyle:(id)sender;	//	2026/10/28 added
 - (IBAction)changePageTransitionDuration:(id)sender;	//	2026/10/28 added
+- (IBAction)toggleKenBurns:(id)sender;	//	2026/10/28 added
+- (IBAction)toggleTwoPageSpread:(id)sender;	//	2026/10/28 added
 - (IBAction)changeFolderDepth:(id)sender;	//	2026/10/28 added
 - (IBAction)changeBackgroundStyle:(id)sender;	//	2026/10/28 added
+- (IBAction)changeTagFilter:(id)sender;	//	2026/10/28 added; the sender's tag is a label number, PGAnyTagFilter or 0
 
 - (IBAction)changeImageScaleMode:(id)sender;
 - (IBAction)zoomIn:(id)sender;

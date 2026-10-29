@@ -627,6 +627,13 @@ CA
                                                 <action selector="changePageTransitionDuration:" target="-1" id="PTr-07-act"/>
                                             </connections>
                                         </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PKb-sp-itm"/>
+                                        <menuItem title="Ken Burns Effect in Slideshows" id="PKb-00-itm">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="toggleKenBurns:" target="-1" id="PKb-00-act"/>
+                                            </connections>
+                                        </menuItem>
                                     </items>
                                 </menu>
                             </menuItem>
@@ -769,6 +776,75 @@ CA
                                 <connections>
                                     <action selector="toggleColorInversion:" target="-1" id="nxg-uy-2g4"/>
                                 </connections>
+                            </menuItem>
+                            <menuItem title="Two Pages Side by Side" keyEquivalent="p" id="PSp-00-itm">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="toggleTwoPageSpread:" target="-1" id="PSp-00-act"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Tag Filter" id="PTf-mn-itm">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <menu key="submenu" title="Tag Filter" id="PTf-mn-mnu">
+                                    <items>
+                                        <menuItem title="All Images" tag="0" keyEquivalent="0" id="PTf-00-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-00-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PTf-s1-itm"/>
+                                        <menuItem title="Red" tag="6" keyEquivalent="1" id="PTf-01-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-01-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Orange" tag="7" keyEquivalent="2" id="PTf-02-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-02-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Yellow" tag="5" keyEquivalent="3" id="PTf-03-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-03-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Green" tag="2" keyEquivalent="4" id="PTf-04-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-04-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Blue" tag="4" keyEquivalent="5" id="PTf-05-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-05-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Purple" tag="3" keyEquivalent="6" id="PTf-06-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-06-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Gray" tag="1" keyEquivalent="7" id="PTf-07-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-07-act"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem isSeparatorItem="YES" id="PTf-s2-itm"/>
+                                        <menuItem title="Any Tag" tag="-1" keyEquivalent="8" id="PTf-08-itm">
+                                            <modifierMask key="keyEquivalentModifierMask" control="YES" option="YES"/>
+                                            <connections>
+                                                <action selector="changeTagFilter:" target="-1" id="PTf-08-act"/>
+                                            </connections>
+                                        </menuItem>
+                                    </items>
+                                </menu>
                             </menuItem>
                             <menuItem title="Background" id="PBg-mn-itm">
                                 <modifierMask key="keyEquivalentModifierMask"/>

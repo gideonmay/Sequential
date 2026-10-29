@@ -40,7 +40,7 @@ NSString *const PGDisplayableIdentifierDisplayNameDidChangeNotification = @"PGDi
 
 @interface PGDisplayableIdentifier ()
 
-@property (nonatomic, copy) NSArray<NSColor *> *cachedTagColors;	//	2026/10/28 added
+@property (nonatomic, copy) NSArray<NSNumber *> *cachedTagLabels;	//	2026/10/28 added
 
 - (instancetype)initWithIdentifier:(PGResourceIdentifier *)ident NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithCoder:(NSCoder *)coder;//NS_DESIGNATED_INITIALIZER;
@@ -389,28 +389,34 @@ NSString *const PGDisplayableIdentifierDisplayNameDidChangeNotification = @"PGDi
 	_naturalDisplayName = [aString copy];
 	[self noteNaturalDisplayNameDidChange];
 }
-- (NSArray<NSColor *> *)tagColors	//	2026/10/28 added
+- (NSArray<NSNumber *> *)tagLabels	//	2026/10/28 added
 {
 	//	cached because the thumbnails ask for them every time they're drawn
-	if(!self.cachedTagColors) {
-		NSMutableArray<NSColor *> *const tagColors = [NSMutableArray array];
+	if(!self.cachedTagLabels) {
+		NSMutableArray<NSNumber *> *const labels = [NSMutableArray array];
 		NSURL *const URL = self.isFileIdentifier ? self.URL : nil;
 		if(URL) {
-			NSWorkspace *const workspace = NSWorkspace.sharedWorkspace;
-			NSArray<NSString *> *const labels = workspace.fileLabels;
-			NSArray<NSColor *> *const colors = workspace.fileLabelColors;
+			NSArray<NSString *> *const labelNames = NSWorkspace.sharedWorkspace.fileLabels;
 			for(NSString *const tag in PGFinderTagsOfURL(URL)) {
-				NSUInteger const label = PGFinderTagLabel(tag, labels);
-				if(label && label < colors.count) [tagColors addObject:colors[label]];
+				NSUInteger const label = PGFinderTagLabel(tag, labelNames);
+				if(label && ![labels containsObject:@(label)]) [labels addObject:@(label)];
 			}
 		}
-		self.cachedTagColors = tagColors;
+		self.cachedTagLabels = labels;
 	}
-	return self.cachedTagColors;
+	return self.cachedTagLabels;
+}
+- (NSArray<NSColor *> *)tagColors	//	2026/10/28 added
+{
+	NSArray<NSColor *> *const colors = NSWorkspace.sharedWorkspace.fileLabelColors;
+	NSMutableArray<NSColor *> *const tagColors = [NSMutableArray array];
+	for(NSNumber *const label in self.tagLabels)
+		if(label.unsignedIntegerValue < colors.count) [tagColors addObject:colors[label.unsignedIntegerValue]];
+	return tagColors;
 }
 - (void)noteFinderTagsDidChange	//	2026/10/28 added
 {
-	self.cachedTagColors = nil;
+	self.cachedTagLabels = nil;
 }
 #if 1
 - (NSColor*)labelColor

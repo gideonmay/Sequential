@@ -155,7 +155,7 @@ static off_t const PGArchiveEntryMaximumThumbnailByteSize = 64ll << 20;
 			[dc noteLoadingProgressForPath:entryPath];
 			//	at most one thumbnail per archive because extracting a late
 			//	entry of a solid archive decompresses everything before it
-			if(!_addedLoadingThumbnail && dc.loadingProgressWantsThumbnail &&
+			if(!_addedLoadingThumbnail && dc.loadingProgressWantsArchiveThumbnail &&	//	2026/10/28 was ...WantsThumbnail
 			   ![_archive entryIsDirectory:(int) i] && ![_archive entryIsEncrypted:(int) i] &&
 			   [_archive representativeSizeOfEntry:(int) i] <= PGArchiveEntryMaximumThumbnailByteSize &&
 			   [[UTType typeWithFilenameExtension:entryPath.pathExtension] conformsToType:UTTypeImage]) {

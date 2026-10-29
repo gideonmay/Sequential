@@ -55,6 +55,11 @@ macOS 27 or later. Changes compared to chuchusoft's 2.6.0:
   the tags as colored dots
 - the Delete key above the arrow keys (forward delete) moves the current
   image to the Trash and shows the next one
+- View > Tag Filter: show only images with a Finder tag
+- Edit > Undo for Move to Trash and tag changes
+- View > Two Pages Side by Side (P) for comics
+- View > Transition > Ken Burns Effect in Slideshows
+- folders on network volumes open much faster
 - the Keyboard Shortcuts help page lists all shortcuts
 - fixed a crash when pressing a key whose menu shortcut has no target
 

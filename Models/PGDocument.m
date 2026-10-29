@@ -78,6 +78,7 @@ NSString *const PGDocumentUpdateRecursivelyKey = @"PGDocumentUpdateRecursively";
 @property (nonatomic, strong) PGActivity *activity;
 
 @property (nonatomic, assign) NSUInteger processingNodeCount;
+@property (nonatomic, strong) NSUndoManager *undoManager;	//	2026/10/28 added
 @property (nonatomic, assign) BOOL sortedChildrenChanged;
 
 - (PGNode *)_initialNode;
@@ -260,6 +261,91 @@ NSString *const PGDocumentUpdateRecursivelyKey = @"PGDocumentUpdateRecursively";
 - (void)close
 {
 	[self _closeWithFileSystemObjectDeleted:NO];
+}
+
+//	MARK: -	2026/10/28 added: changes to the files that can be undone
+
+- (NSUndoManager *)undoManager
+{
+	if(!_undoManager) _undoManager = [NSUndoManager new];
+	return _undoManager;
+}
+- (void)moveNodesToTrash:(NSArray<PGNode *> *)nodes
+{
+	NSMutableArray<PGNode *> *const trashable = [NSMutableArray array];
+	NSMutableArray<NSURL *> *const URLs = [NSMutableArray array];
+	for(PGNode *const node in nodes) {
+		PGResourceIdentifier *const ident = node.identifier;
+		if(!ident.isFileIdentifier || !ident.URL) continue;
+		[trashable addObject:node];
+		[URLs addObject:ident.URL];
+	}
+	if(!URLs.count) return NSBeep();
+	//	the completion handler runs on an arbitrary queue
+	[NSWorkspace.sharedWorkspace recycleURLs:URLs completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
+		dispatch_async(dispatch_get_main_queue(), ^{
+			if(error) NSBeep();
+			//	the folder of each file is kept so it can be rescanned when it's put back
+			NSMutableDictionary<NSURL *, NSURL *> *const trashURLs = [NSMutableDictionary dictionary];
+			NSMutableDictionary<NSURL *, PGNode *> *const parents = [NSMutableDictionary dictionary];
+			for(PGNode *const node in trashable) {
+				NSURL *const URL = node.identifier.URL;
+				NSURL *const trashURL = URL ? newURLs[URL] : nil;
+				if(!trashURL) continue;
+				trashURLs[URL] = trashURL;
+				if(node.parentNode) parents[URL] = node.parentNode;
+				[node removeFromDocument];
+			}
+			if(!trashURLs.count) return;
+			[self.undoManager registerUndoWithTarget:self handler:^(PGDocument *document) {
+				[document _putBackTrashedFiles:trashURLs parents:parents];
+			}];
+			[self.undoManager setActionName:NSLocalizedString(@"Move to Trash", @"Undo action name.")];
+		});
+	}];
+}
+- (void)_putBackTrashedFiles:(NSDictionary<NSURL *, NSURL *> *)trashURLs parents:(NSDictionary<NSURL *, PGNode *> *)parents
+{
+	//	a file that has been removed from the Trash, or whose name is taken
+	//	again, can't be put back
+	NSMutableArray<PGNode *> *const restored = [NSMutableArray array];
+	BOOL failed = NO;
+	for(NSURL *const URL in trashURLs) {
+		if(![NSFileManager.defaultManager moveItemAtURL:trashURLs[URL] toURL:URL error:NULL]) {
+			failed = YES;
+			continue;
+		}
+		//	rescans the folder now instead of waiting for its file system event
+		PGNode *const parent = parents[URL];
+		[parent noteFileEventDidOccurDirect:YES];
+		PGResourceAdapter *const adapter = parent.resourceAdapter;
+		PGNode *const node = adapter.isContainer ? [(PGContainerAdapter *)adapter childForIdentifier:URL.PG_resourceIdentifier] : nil;
+		if(node) [restored addObject:node];
+	}
+	if(failed) NSBeep();
+	if(restored.count) {
+		[self.undoManager registerUndoWithTarget:self handler:^(PGDocument *document) {
+			[document moveNodesToTrash:restored];
+		}];
+		[self.undoManager setActionName:NSLocalizedString(@"Move to Trash", @"Undo action name.")];
+		[self.displayController activateNode:restored.firstObject];
+	}
+}
+- (BOOL)setFinderTags:(NSArray<NSString *> *)tags ofNode:(PGNode *)node actionName:(NSString *)actionName
+{
+	PGResourceIdentifier *const ident = node.identifier;
+	NSURL *const URL = ident.isFileIdentifier ? ident.URL : nil;
+	if(!URL) return NO;
+	NSArray<NSString *> *const previousTags = PGFinderTagsOfURL(URL);
+	if(!PGSetFinderTagsOfURL(URL, tags)) return NO;
+	[self.undoManager registerUndoWithTarget:self handler:^(PGDocument *document) {
+		if(![document setFinderTags:previousTags ofNode:node actionName:actionName]) NSBeep();
+	}];
+	[self.undoManager setActionName:actionName];
+	[node.identifier noteFinderTagsDidChange];
+	[self noteNodeThumbnailDidChange:node recursively:NO];
+	[self.displayController noteFinderTagsDidChangeForNode:node];
+	return YES;
 }
 - (void)openBookmark:(PGBookmark *)aBookmark
 {

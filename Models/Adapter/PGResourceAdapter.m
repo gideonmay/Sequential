@@ -662,8 +662,9 @@ ThumbnailOf(NSImageRep *imageRep, NSSize size, PGOrientation orientation, BOOL o
 {
 	//	2023/10/14 optimized to reduce I/O requests:
 	//	calls to -fourCCData occur only when necessary and only occur once
+	//	2026/10/28 fourCCData is NULL when the file's contents shouldn't be read
 	id o = dict[PGBundleTypeFourCCsKey];
-	if(o) {
+	if(o && fourCCData) {
 		if(0 == *fourCCData) {
 			NSData *const self_fourCCData = self.fourCCData;
 			if(self_fourCCData)
@@ -716,13 +717,23 @@ ThumbnailOf(NSImageRep *imageRep, NSSize size, PGOrientation orientation, BOOL o
 	NSDictionary *const types = [PGResourceAdapter typesDictionary];
 	NSMutableDictionary *const adapterByPriority = [NSMutableDictionary dictionaryWithObjectsAndKeys:@0U, [PGResourceAdapter class], nil];
 	uint8_t fourCCData[4] = {0,0,0,0};	//	2023/10/14
-	for(NSString *const classString in types) {
-		Class const class = NSClassFromString(classString);
-		if(!class) continue;
-		NSDictionary *const typeDict = types[classString];
-		NSUInteger const p = [self _matchPriorityForTypeDictionary:typeDict withFourCCData:fourCCData];
-		if(p) adapterByPriority[(id<NSCopying>)class] = @(p);
-	}
+	//	2026/10/28 the type is first matched by the file's name and type; the
+	//	start of the file is only read (to match its signature) when that finds
+	//	nothing: reading it costs a round trip per file on network volumes, which
+	//	was most of the time it took to open large folders there. A file whose
+	//	extension doesn't fit its contents (eg, a RAR archive named .cbz) still
+	//	gets the adapter of its extension, which handles both kinds anyway
+	//	(only for files whose name doesn't give a type: no or an unknown extension)
+	NSString *const UTI = self.UTIType;
+	BOOL const typeIsUnknown = !self.extension.length || !UTI || [UTI hasPrefix:@"dyn."];
+	for(int pass = 0; pass < (typeIsUnknown ? 2 : 1) && adapterByPriority.count <= 1; pass++)
+		for(NSString *const classString in types) {
+			Class const class = NSClassFromString(classString);
+			if(!class) continue;
+			NSDictionary *const typeDict = types[classString];
+			NSUInteger const p = [self _matchPriorityForTypeDictionary:typeDict withFourCCData:pass ? fourCCData : NULL];
+			if(p) adapterByPriority[(id<NSCopying>)class] = @(p);
+		}
 	return [adapterByPriority keysSortedByValueUsingSelector:@selector(compare:)];
 }
 

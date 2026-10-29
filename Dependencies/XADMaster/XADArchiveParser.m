@@ -422,7 +422,10 @@ resourceFork:(XADResourceFork *)fork name:(NSString *)name propertiesToAdd:(NSMu
 	CSHandle *handle=[CSFileHandle fileHandleForReadingAtPath:filename];
 	NSData *header=[handle readDataOfLengthAtMost:maxheader];
 
-	CSHandle *forkhandle=[XADPlatform handleForReadingResourceForkAtPath:filename];
+	// 2026/10/28 Sequential: no resource fork lookup; none of the parsers that
+	// are enabled (see +initialize) uses one, and on network volumes each
+	// lookup is a round trip per archive
+	CSHandle *forkhandle=nil;
 	XADResourceFork *fork=[XADResourceFork resourceForkWithHandle:forkhandle error:NULL];
 
 	NSMutableDictionary *props=[NSMutableDictionary dictionary];

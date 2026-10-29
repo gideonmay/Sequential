@@ -72,6 +72,8 @@ NSString *const PGImageScaleConstraintKey = @"PGImageScaleConstraint";
 NSString *const PGPageTransitionStyleKey = @"PGPageTransitionStyle";	//	2026/10/28 added
 NSString *const PGPageTransitionDurationKey = @"PGPageTransitionDuration";	//	2026/10/28 added
 NSString *const PGBackgroundStyleKey = @"PGBackgroundStyle";	//	2026/10/28 added
+NSString *const PGKenBurnsKey = @"PGKenBurns";	//	2026/10/28 added
+NSString *const PGTwoPageSpreadKey = @"PGTwoPageSpread";	//	2026/10/28 added
 
 //	thumbnail prefs pane
 NSString *const PGShowThumbnailImageNameKey = @"PGShowThumbnailImageName";	//	2023/10/01 added
@@ -222,6 +224,8 @@ static PGDocumentController *PGSharedDocumentController = nil;
 		PGPageTransitionStyleKey: @(PGNoPageTransition),
 		PGPageTransitionDurationKey: @500,
 		PGBackgroundStyleKey: @(PGAmbientBackground),
+		PGKenBurnsKey: @NO,
+		PGTwoPageSpreadKey: @NO,
 
 		PGShowThumbnailImageNameKey: @NO,
 		PGShowThumbnailImageSizeKey: @NO,
@@ -778,8 +782,14 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 }
 - (BOOL)loadingProgressWantsThumbnail	//	2026/10/28 added
 {
+	//	2026/10/28 at most one a second: on network volumes, reading the images
+	//	slows down the reading of the folders
 	return _loadingPanel && !_loadingThumbnailPending &&
-		CFAbsoluteTimeGetCurrent() - _loadingLastThumbnailTime >= 0.5;
+		CFAbsoluteTimeGetCurrent() - _loadingLastThumbnailTime >= 1.0;
+}
+- (BOOL)loadingProgressWantsArchiveThumbnail	//	2026/10/28 added
+{
+	return self.loadingProgressWantsThumbnail && CFAbsoluteTimeGetCurrent() - _loadingLastThumbnailTime >= 3.0;
 }
 - (void)addLoadingProgressThumbnailFromURL:(NSURL *)URL	//	2026/10/28 added
 {
@@ -804,7 +814,9 @@ extern	const NSString* const	PGUseEntireScreenWhenInFullScreenKey;
 		generation = _loadingGeneration;
 	}
 	NSDictionary *const options = @{
-		(id)kCGImageSourceCreateThumbnailFromImageAlways: @YES,
+		//	2026/10/28 the thumbnail in the file, when it has one, so that only
+		//	the start of the file is read (was ...FromImageAlways)
+		(id)kCGImageSourceCreateThumbnailFromImageIfAbsent: @YES,
 		(id)kCGImageSourceCreateThumbnailWithTransform: @YES,
 		(id)kCGImageSourceThumbnailMaxPixelSize: @(PGLoadingThumbnailSize * panel.backingScaleFactor)};
 	dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{

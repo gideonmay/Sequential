@@ -53,6 +53,8 @@ extern NSString *const PGDimOtherScreensKey;
 extern NSString *const PGPageTransitionStyleKey;	//	2026/10/28 added
 extern NSString *const PGPageTransitionDurationKey;	//	2026/10/28 added (milliseconds)
 extern NSString *const PGBackgroundStyleKey;	//	2026/10/28 added (PGBackgroundStyle)
+extern NSString *const PGKenBurnsKey;	//	2026/10/28 added (BOOL)
+extern NSString *const PGTwoPageSpreadKey;	//	2026/10/28 added (BOOL)
 
 //	thumbnail prefs pane
 extern NSString *const PGShowThumbnailImageNameKey;	//	2023/10/01 added
@@ -253,6 +255,7 @@ typedef NS_ENUM(NSUInteger, PGImageScaleConstraint) {
 //	the panel shows a strip of recently loaded images; thumbnails are created
 //	on a background queue and are only wanted every so often
 @property (readonly) BOOL loadingProgressWantsThumbnail;
+@property (readonly) BOOL loadingProgressWantsArchiveThumbnail;	//	2026/10/28 added: less often (an image has to be extracted)
 - (void)addLoadingProgressThumbnailFromURL:(NSURL *)URL;
 - (void)addLoadingProgressThumbnailFromData:(NSData *)data;
 - (void)noteNewRecentDocument:(PGDocument *)document;

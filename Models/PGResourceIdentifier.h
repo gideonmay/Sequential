@@ -121,6 +121,7 @@ typedef UInt8 PGLabelColor;
 //@property(readonly) PGLabelColor labelColor;	2021/07/21 modernized
 @property (nonatomic, readonly) NSColor* labelColor;
 @property (nonatomic, readonly) NSArray<NSColor *> *tagColors;	//	2026/10/28 added: the colors of the file's Finder tags (cached)
+@property (nonatomic, readonly) NSArray<NSNumber *> *tagLabels;	//	2026/10/28 added: the label numbers of the file's Finder tags in their order (cached)
 #else
 @property(assign) BOOL postsNotifications;
 @property(retain) NSImage *icon;
