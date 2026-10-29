@@ -1,3 +1,34 @@
+2.7.0 (2026-10-29), fork at https://github.com/gideonmay/Sequential
+- builds with Xcode 27 against the macOS 27 SDK and requires macOS 27; the
+  XADMaster and UniversalDetector dependencies are included in the
+  Dependencies folder.
+- View > Transition: 31 animated page transitions (Core Animation and Core
+  Image, eg, Fade, Push, Cube, Page Curl, Ripple, Swirl, Mosaic, Rain, Book,
+  Door, Shatter) and Random, at Fast, Normal or Slow speed, also during the
+  Timer slideshow.
+- View > Folder Depth, Settings > Navigation and the File > Open panel:
+  choose how many levels of subfolders are included.
+- View > Background: Ambient (a blurred copy of the image fills the area
+  around it), Black or the Settings color.
+- File > Tags: Control-1 to Control-7 add or remove a Finder tag of the
+  current image, Control-0 removes all its tags; the info bubble and the
+  thumbnails show the tags as colored dots.
+- the Delete key above the arrow keys (forward delete) moves the current
+  image to the Trash and shows the next one, also during a slideshow.
+- a Loading panel with progress, thumbnails and Stop for slow loads; folders
+  of large archives on external volumes open much faster.
+- the thumbnails: clicking a folder or archive shows its first image, a
+  context menu (Show in Finder, Copy, Move to Trash, ...), folders and
+  archives show their first page.
+- "Open in Sequential" service for folders, PDFs and archives in the Finder.
+- the Open panel is shown at launch when nothing else is opened.
+- the Keyboard Shortcuts help page lists all shortcuts.
+- security: fixes for memory-safety bugs in the RAR decoder, fewer archive
+  formats are parsed, size limits when extracting, no external XML entities,
+  hardened runtime.
+- crash fixes: a key press whose menu shortcut has no target, clicking a
+  folder that wasn't loaded, removing the last image, and others.
+
 2.6.0 (2024-09-07)
 - Sequential was crashing when resuming a bookmarked folder (it was
   attempting to access a deleted object). Fixed.

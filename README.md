@@ -1,4 +1,4 @@
-# Sequential 2.6.0 (2024-09-07).
+# Sequential 2.7.0 (2026-10-29), a fork of chuchusoft's Sequential 2.6.0
 
 Sequential is an image and comic viewer for macOS. It can display images
 in folders, PDF files, and archives of these formats: ZIP CBZ RAR CBR 7z.
@@ -38,9 +38,12 @@ macOS 27 or later. Changes compared to chuchusoft's 2.6.0:
   longer treated as errors
 - the XADMaster and UniversalDetector dependencies are included in the
   `Dependencies` folder so the repository builds on its own
-- View > Transition: animated page transitions (Fade, Push, Move In,
-  Reveal) at Fast, Normal or Slow speed, played on every page turn,
+- View > Transition: 31 animated page transitions (Core Animation and
+  Core Image, eg, Fade, Push, Cube, Page Curl, Ripple, Swirl, Mosaic, Rain)
+  and Random, at Fast, Normal or Slow speed, played on every page turn,
   including the Timer slideshow
+- View > Background: Ambient (a blurred copy of the image around it),
+  Black or the Settings color
 - folder depth: choose how many levels of subfolders are included when
   viewing a folder, from Top Level Only to All Subfolders, in the
   File > Open panel, in View > Folder Depth (rescans the open folder) and

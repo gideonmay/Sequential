@@ -137,6 +137,9 @@ static PGAboutBoxController *PGSharedAboutBoxController;
 	toolbar.delegate = self;
 	self.window.toolbar = toolbar;
 	[self.window setShowsToolbarButton:NO];
+	//	2026/10/28 the window title shows the version (it wasn't shown anywhere)
+	NSString *const version = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+	if(version) self.window.title = [NSString stringWithFormat:@"%@ %@", self.window.title, version];
 	[self.window center];
 	[self changePane:nil];
 	[super windowDidLoad];
