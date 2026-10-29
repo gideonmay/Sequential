@@ -37,3 +37,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #endif
 
 @end
+
+//	2026/10/28 added: a video file on disk; it's read as its first frame (so that
+//	sizing, transitions and thumbnails work as for images) and played by the
+//	display controller
+@interface PGVideoAdapter : PGGenericImageAdapter
+@property (readonly) NSURL *videoURL;	//	nil if it can't be played (eg, in an archive)
+@end

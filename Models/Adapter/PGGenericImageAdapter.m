@@ -23,6 +23,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import "PGGenericImageAdapter.h"
+#import <AVFoundation/AVFoundation.h>	//	2026/10/28 added for PGVideoAdapter
 
 // Models
 #import "PGDocument.h"
@@ -345,5 +346,48 @@ static NSBitmapImageRep *PGImageSourceImageRepAtIndex(CGImageSourceRef source, s
 	[super dealloc];
 }
 #endif
+
+@end
+
+//	MARK: -	2026/10/28 added
+
+@implementation PGVideoAdapter
+
+- (NSURL *)videoURL
+{
+	PGResourceIdentifier *const ident = self.dataProvider.identifier;
+	return ident.isFileIdentifier ? ident.URL : nil;
+}
+- (BOOL)canSaveData
+{
+	return YES;
+}
+- (void)generateImagesInOperation:(NSOperation *)operation thumbnailSize:(NSSize)size
+{
+	//	the first frame, as the page's image and its thumbnail
+	NSURL *const URL = self.videoURL;
+	CGImageRef frame = NULL;
+	if(URL && !operation.isCancelled) {
+		AVURLAsset *const asset = [AVURLAsset URLAssetWithURL:URL options:nil];
+		AVAssetImageGenerator *const generator = [AVAssetImageGenerator assetImageGeneratorWithAsset:asset];
+		generator.appliesPreferredTrackTransform = YES;
+		dispatch_semaphore_t const done = dispatch_semaphore_create(0);
+		__block CGImageRef image = NULL;
+		[generator generateCGImageAsynchronouslyForTime:kCMTimeZero completionHandler:^(CGImageRef result, CMTime actualTime, NSError *error) {
+			if(result) image = CGImageRetain(result);
+			dispatch_semaphore_signal(done);
+		}];
+		dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
+		frame = image;
+	}
+	NSBitmapImageRep *const rep = frame ? [[NSBitmapImageRep alloc] initWithCGImage:frame] : nil;
+	if(frame) CGImageRelease(frame);
+	if(operation.isCancelled) return;
+	if(!self.cachedRep)
+		[self performSelectorOnMainThread:@selector(_readFinishedWithImageRep:) withObject:rep waitUntilDone:NO];
+	if(rep && [PGThumbnailController shouldShowThumbnailsForDocument:self.document])
+		[self _setThumbnailImageInOperation:operation imageRep:rep thumbnailSize:size
+			orientation:PGUpright opaque:YES setParentContainerThumbnail:NO];
+}
 
 @end

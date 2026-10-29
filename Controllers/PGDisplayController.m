@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 #import <unistd.h>
 #import <tgmath.h>
 #import <QuartzCore/QuartzCore.h>	//	2024/08/14 added for -invertColors:
+#import <AVKit/AVKit.h>	//	2026/10/28 added for videos
 
 // Models
 #import "PGDocument.h"
@@ -195,6 +196,10 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 @property (nonatomic, assign) BOOL pageTransitionPending;	//	2026/10/28 added
 @property (nonatomic, assign) BOOL pageTransitionForward;	//	2026/10/28 added
 @property (nonatomic, strong) NSView *kenBurnsView;	//	2026/10/28 added
+@property (nonatomic, strong) AVPlayerView *videoView;	//	2026/10/28 added: plays a video page over its first frame
+@property (nonatomic, strong) id videoEndObserver;	//	2026/10/28 added
+@property (nonatomic, assign) BOOL videoEnded;	//	2026/10/28 added
+@property (nonatomic, assign) BOOL advanceWhenVideoEnds;	//	2026/10/28 added: the Timer fired during the video
 //	2026/10/28 added: two pages side by side (see -nodeReadyForViewing:)
 @property (nonatomic, strong) PGNode *spreadPartner;	//	the second page, while it's read or shown
 @property (nonatomic, strong) NSImageRep *spreadFirstRep;	//	the first page's image while the second is read
@@ -211,6 +216,9 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 - (void)_startKenBurnsIfAppropriate;	//	2026/10/28 added
 - (NSBitmapImageRep *)_kenBurnsSnapshot;	//	2026/10/28 added
 - (void)_endKenBurns;	//	2026/10/28 added
+- (void)_showVideoIfNeeded;	//	2026/10/28 added
+- (void)_playVideo;	//	2026/10/28 added
+- (void)_endVideo;	//	2026/10/28 added
 - (BOOL)_spreadsEnabled;	//	2026/10/28 added
 - (BOOL)_isSpreadPage:(PGNode *)node;	//	2026/10/28 added
 - (void)spreadPartnerReadyForViewing:(NSNotification *)aNotif;	//	2026/10/28 added
@@ -797,6 +805,16 @@ PGFinderTagImage(NSColor *color)
 }
 - (IBAction)toggleAnimation:(id)sender
 {
+	AVPlayer *const player = _videoView.player;	//	2026/10/28 added: plays or pauses a video
+	if(player) {
+		BOOL const nowPlaying = 0.0f == player.rate;
+		if(nowPlaying && _videoEnded) [player seekToTime:kCMTimeZero];
+		_videoEnded = NO;
+		if(nowPlaying) [player play];
+		else [player pause];
+		[_graphicPanel.contentView pushGraphic:[PGBezierPathIconGraphic graphicWithIconType:nowPlaying ? AEPlayIcon : AEPauseIcon] window:self.window];
+		return;
+	}
 	NSParameterAssert([_imageView canAnimateRep]);
 	BOOL const nowPlaying = !self.activeDocument.animatesImages;
 	[_graphicPanel.contentView pushGraphic:[PGBezierPathIconGraphic graphicWithIconType:nowPlaying ? AEPlayIcon : AEPauseIcon] window:self.window];
@@ -1516,6 +1534,11 @@ PGFinderTagImage(NSColor *color)
 }
 - (void)advanceOnTimer
 {
+	//	2026/10/28 a video is played to its end first
+	if(_videoView && !_videoEnded) {
+		_advanceWhenVideoEnds = YES;
+		return;
+	}
 	self.timerRunning = [self tryToGoForward:YES allowAlerts:YES];
 }
 
@@ -1596,7 +1619,7 @@ PGFinderTagImage(NSColor *color)
 	BOOL const suppressed = _spreadSuppressed;
 	_spreadForcedPartner = nil;
 	_spreadSuppressed = NO;
-	if(!error && !_spreadComposed && !suppressed && self._spreadsEnabled) {
+	if(!error && !_spreadComposed && !suppressed && self._spreadsEnabled && [self _isSpreadPage:self.activeNode]) {
 		NSImageRep *const rep = aNotif.userInfo[PGImageRepKey];
 		BOOL const portrait = rep && PGIsPortrait(rep, [self.activeNode.resourceAdapter orientationWithBase:YES]);
 		if(forcedPartner && !portrait) {
@@ -1636,8 +1659,12 @@ PGFinderTagImage(NSColor *color)
 			[_clipView scrollToLocation:_initialLocation animation:PGNoAnimation];
 		[self.window makeFirstResponder:_clipView];
 		[self _updateAmbientBackground];	//	2026/10/28 added
+		[self _showVideoIfNeeded];	//	2026/10/28 added; paused on its first frame
 		[self _runPageTransitionFromSnapshot:transitionSnapshot];	//	2026/10/28 added
-		if(!_pageTransitionView) [self _startKenBurnsIfAppropriate];	//	2026/10/28 added; else when it ends
+		if(!_pageTransitionView) {	//	2026/10/28 added; else when it ends
+			[self _playVideo];
+			[self _startKenBurnsIfAppropriate];
+		}
 #else
 		[clipView setDocumentView:_imageView];
 		if(PGPreserveLocation == _initialLocation)
@@ -1725,7 +1752,8 @@ PGFinderTagImage(NSColor *color)
 }
 - (BOOL)_isSpreadPage:(PGNode *)node	//	2026/10/28 added
 {
-	return node.isViewable && [node.resourceAdapter isKindOfClass:[PGGenericImageAdapter class]];
+	return node.isViewable && [node.resourceAdapter isKindOfClass:[PGGenericImageAdapter class]] &&
+		![node.resourceAdapter isKindOfClass:[PGVideoAdapter class]];
 }
 - (IBAction)toggleTwoPageSpread:(id)sender	//	2026/10/28 added
 {
@@ -1930,6 +1958,35 @@ PGFinderTagImage(NSColor *color)
 	//	it would jump back to its normal size when the transition starts
 	NSBitmapImageRep *const kenBurnsSnapshot = pending ? [self _kenBurnsSnapshot] : nil;
 	[self _endKenBurns];
+	//	2026/10/28 an outgoing video is shown with the frame it's at (the player
+	//	isn't in snapshots) by drawing that frame instead of its first one
+	AVPlayer *const player = _videoView.player;
+	if(pending && player && _imageView.rep) {
+		AVAssetImageGenerator *const generator = [AVAssetImageGenerator assetImageGeneratorWithAsset:player.currentItem.asset];
+		generator.appliesPreferredTrackTransform = YES;
+		generator.requestedTimeToleranceBefore = generator.requestedTimeToleranceAfter = CMTimeMake(1, 10);
+		//	waits at most half a second; a frame that comes later is dropped
+		NSMutableArray *const result = [NSMutableArray array];
+		dispatch_semaphore_t const done = dispatch_semaphore_create(0);
+		[generator generateCGImageAsynchronouslyForTime:player.currentTime completionHandler:^(CGImageRef image, CMTime actualTime, NSError *error) {
+			@synchronized(result) {
+				if(image) [result addObject:(__bridge id)image];
+			}
+			dispatch_semaphore_signal(done);
+		}];
+		(void)dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC / 2));
+		CGImageRef frame = NULL;
+		@synchronized(result) {
+			if(result.count) frame = CGImageRetain((__bridge CGImageRef)result.firstObject);
+			[result removeAllObjects];
+		}
+		if(frame) {
+			NSBitmapImageRep *const rep = [[NSBitmapImageRep alloc] initWithCGImage:frame];
+			CGImageRelease(frame);
+			[_imageView setImageRep:rep orientation:_imageView.orientation size:_imageView.frame.size];
+		}
+	}
+	[self _endVideo];
 	if(!pending) return nil;
 	NSUserDefaults *const d = [NSUserDefaults standardUserDefaults];
 	if(PGNoPageTransition == [d integerForKey:PGPageTransitionStyleKey] ||
@@ -1992,6 +2049,7 @@ PGFinderTagImage(NSColor *color)
 		PGDisplayController *const strongSelf = weakSelf;
 		if(strongSelf && strongSelf.pageTransitionView == weakView) {
 			[strongSelf _endPageTransition];
+			[strongSelf _playVideo];	//	2026/10/28 added
 			[strongSelf _startKenBurnsIfAppropriate];	//	2026/10/28 added
 		}
 	};
@@ -2412,11 +2470,57 @@ PGFinderTagImage(NSColor *color)
 		_clipView.documentView == _imageView && _imageView.rep && !_imageView.wantsLayer;
 	_clipView.ambientImage = show ? PGAmbientImageOf(_imageView.rep, _imageView.orientation) : nil;
 }
+- (void)_showVideoIfNeeded	//	2026/10/28 added
+{
+	//	a player over the first frame (the image view's subview, so it follows
+	//	zooming and scrolling); it starts playing when a transition has ended
+	[self _endVideo];
+	PGResourceAdapter *const adapter = self.activeNode.resourceAdapter;
+	NSURL *const URL = [adapter isKindOfClass:[PGVideoAdapter class]] ? ((PGVideoAdapter *)adapter).videoURL : nil;
+	if(!URL || _clipView.documentView != _imageView || _spreadComposed) return;
+	AVPlayer *const player = [AVPlayer playerWithURL:URL];
+	player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
+	AVPlayerView *const view = [[AVPlayerView alloc] initWithFrame:_imageView.bounds];
+	view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+	view.controlsStyle = AVPlayerViewControlsStyleFloating;
+	view.showsFullScreenToggleButton = NO;
+	view.videoGravity = AVLayerVideoGravityResizeAspect;
+	view.player = player;
+	[_imageView addSubview:view];
+	_videoView = view;
+	_videoEnded = NO;
+	__weak PGDisplayController *const weakSelf = self;
+	_videoEndObserver = [[NSNotificationCenter defaultCenter] addObserverForName:AVPlayerItemDidPlayToEndTimeNotification
+		object:player.currentItem queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+		PGDisplayController *const strongSelf = weakSelf;
+		if(!strongSelf || strongSelf.videoView.player.currentItem != note.object) return;
+		strongSelf.videoEnded = YES;
+		if(strongSelf.advanceWhenVideoEnds) {
+			strongSelf.advanceWhenVideoEnds = NO;
+			if(strongSelf.timerRunning) [strongSelf advanceOnTimer];
+		}
+	}];
+}
+- (void)_playVideo	//	2026/10/28 added
+{
+	[_videoView.player play];
+}
+- (void)_endVideo	//	2026/10/28 added
+{
+	if(_videoEndObserver) [[NSNotificationCenter defaultCenter] removeObserver:_videoEndObserver];
+	_videoEndObserver = nil;
+	[_videoView.player pause];
+	_videoView.player = nil;
+	[_videoView removeFromSuperview];
+	_videoView = nil;
+	_videoEnded = NO;
+	_advanceWhenVideoEnds = NO;
+}
 - (void)_startKenBurnsIfAppropriate	//	2026/10/28 added
 {
 	//	a slow zoom (by 10%) towards a random point of a snapshot of the page,
 	//	during the slideshow; it lasts until the next page is shown
-	if(_kenBurnsView || _pageTransitionView || !self.timerRunning) return;
+	if(_kenBurnsView || _pageTransitionView || !self.timerRunning || _videoView) return;
 	if(![[NSUserDefaults standardUserDefaults] boolForKey:PGKenBurnsKey]) return;
 	if(_clipView.documentView != _imageView || !_imageView.rep || self.isReading) return;
 	if(_imageView.wantsLayer) return;	//	Invert Colors (snapshots aren't inverted)
@@ -2532,6 +2636,7 @@ PGFinderTagImage(NSColor *color)
 	if(aNode == _activeNode) return NO;
 	[_activeNode PG_removeObserver:self name:PGNodeLoadingDidProgressNotification];
 	[_activeNode PG_removeObserver:self name:PGNodeReadyForViewingNotification];
+	[self _endVideo];	//	2026/10/28 added
 	//	2026/10/28 a spread ends with the page; its partner's read still finishes
 	[_spreadPartner PG_removeObserver:self name:PGNodeReadyForViewingNotification];
 	_spreadPartner = nil;
@@ -3025,6 +3130,10 @@ PGFinderTagImage(NSColor *color)
 	if(@selector(toggleThumbnails:) == action) [anItem setTitle:NSLocalizedString(([[self activeDocument] showsThumbnails] ? @"Hide Thumbnails" : @"Show Thumbnails"), @"Lets the user toggle whether thumbnails are shown. Two states of the same item.")];
 	if(@selector(changeReadingDirection:) == action) anItem.state = self.activeDocument.readingDirection == tag;
 	if(@selector(revertOrientation:) == action) anItem.state = self.activeDocument.baseOrientation == PGUpright;
+	if(@selector(toggleAnimation:) == action && _videoView.player) {	//	2026/10/28 added
+		anItem.title = 0.0f != _videoView.player.rate ? NSLocalizedString(@"Pause Video", @"Title of menu item for playing or pausing a video. Two states.") : NSLocalizedString(@"Play Video", @"Title of menu item for playing or pausing a video. Two states.");
+		return YES;
+	}
 	if(@selector(toggleAnimation:) == action) {
 		BOOL const canAnimate = _imageView.canAnimateRep;
 		anItem.title = canAnimate && self.activeDocument.animatesImages ? NSLocalizedString(@"Turn Animation Off", @"Title of menu item for toggling animation. Two states.") : NSLocalizedString(@"Turn Animation On", @"Title of menu item for toggling animation. Two states.");
@@ -3136,7 +3245,7 @@ PGFinderTagImage(NSColor *color)
 	if(![PGThumbnailController canShowThumbnailsForDocument:self.activeDocument]) {
 		if(@selector(toggleThumbnails:) == action) return NO;
 	}
-	if(!_imageView.canAnimateRep) {
+	if(!_imageView.canAnimateRep && !_videoView) {	//	2026/10/28 or a video
 		if(@selector(toggleAnimation:) == action) return NO;
 	}
 	PGDocument *const doc = self.activeDocument;
@@ -3292,6 +3401,7 @@ PGFinderTagImage(NSColor *color)
 		return;
 	if(_findPanel.parentWindow)
 		[_findPanel close];
+	[self _endVideo];	//	2026/10/28 added
 	[self close];
 }
 

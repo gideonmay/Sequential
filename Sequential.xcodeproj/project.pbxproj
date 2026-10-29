@@ -1645,6 +1645,12 @@
 				OTHER_LDFLAGS = (
 					"$(OTHER_LDFLAGS)",
 					"-ObjC",
+					"-framework",
+					AVKit,
+					"-framework",
+					AVFoundation,
+					"-framework",
+					CoreMedia,
 				);
 				PRODUCT_NAME = Sequential;
 				WRAPPER_EXTENSION = app;
@@ -1666,6 +1672,12 @@
 				OTHER_LDFLAGS = (
 					"$(OTHER_LDFLAGS)",
 					"-ObjC",
+					"-framework",
+					AVKit,
+					"-framework",
+					AVFoundation,
+					"-framework",
+					CoreMedia,
 				);
 				PRODUCT_NAME = Sequential;
 				WRAPPER_EXTENSION = app;

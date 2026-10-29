@@ -959,6 +959,34 @@
 		</dict>
 		<key>PGResourceAdapter</key>
 		<dict/>
+		<key>PGVideoAdapter</key>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>mp4</string>
+				<string>m4v</string>
+				<string>mov</string>
+				<string>qt</string>
+				<string>3gp</string>
+				<string>3g2</string>
+			</array>
+			<key>CFBundleTypeMIMETypes</key>
+			<array>
+				<string>video/mp4</string>
+				<string>video/x-m4v</string>
+				<string>video/quicktime</string>
+				<string>video/3gpp</string>
+				<string>video/3gpp2</string>
+			</array>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.mpeg-4</string>
+				<string>com.apple.m4v-video</string>
+				<string>com.apple.quicktime-movie</string>
+				<string>public.3gpp</string>
+				<string>public.3gpp2</string>
+			</array>
+		</dict>
 		<key>PGWebAdapter</key>
 		<dict/>
 	</dict>

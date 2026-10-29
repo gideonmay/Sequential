@@ -26,6 +26,8 @@
 - Edit > Undo puts images moved to the Trash back and reverts tag changes.
 - View > Two Pages Side by Side (P): two portrait pages are shown together.
 - View > Transition > Ken Burns Effect in Slideshows.
+- videos (MP4, M4V, MOV, 3GP) in folders are shown and played; the slideshow
+  waits until a video has ended; M plays or pauses.
 - archives in a folder are only opened when they're needed (eg, when the
   next page is in one), so folders of many archives open much faster.
 - folders on network volumes open much faster (the type of a file is
