@@ -3688,6 +3688,14 @@ proposedFrame.size.width, proposedFrame.size.height); */
 		case PGKeyForwardDelete:	//	2026/10/28 added; repeats are ignored so that
 			if(!anEvent.ARepeat) [self _moveActiveNodeToTrash];	//	holding the key can't trash many images
 			return YES;
+		//	2026/10/31 added (they scrolled by one screen); repeats are ignored because
+		//	they'd queue up while an archive is being opened on a slow volume
+		case PGKeyPageUp:
+			if(!anEvent.ARepeat) [self firstOfPreviousFolder:self];
+			return YES;
+		case PGKeyPageDown:
+			if(!anEvent.ARepeat) [self firstOfNextFolder:self];
+			return YES;
 	}
 	if(!modifiers || !(~(NSEventModifierFlagCommand | NSEventModifierFlagShift) & modifiers)) switch(keyCode) {
 		case PGKeyPadPlus:

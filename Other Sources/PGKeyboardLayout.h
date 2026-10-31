@@ -61,6 +61,8 @@ enum {
 	PGKeyReturn = 36,
 	PGKeyEscape = 53,
 	PGKeyForwardDelete = 117,	//	2026/10/28 added: the Delete key above the arrow keys
+	PGKeyPageUp = 116,	//	2026/10/31 added
+	PGKeyPageDown = 121,	//	2026/10/31 added
 	PGKeyEquals = 24,
 	PGKeyMinus = 27,
 

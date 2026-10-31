@@ -32,6 +32,8 @@
   next page is in one), so folders of many archives open much faster.
 - folders on network volumes open much faster (the type of a file is
   detected by its name instead of reading the start of every file).
+- Page Down and Page Up go to the next and previous folder or archive
+  (they used to scroll by one screen).
 - the Keyboard Shortcuts help page lists all shortcuts.
 - security: fixes for memory-safety bugs in the RAR decoder, fewer archive
   formats are parsed, size limits when extracting, no external XML entities,

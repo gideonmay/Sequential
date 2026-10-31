@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 // Other Sources
 #import "PGAppKitAdditions.h"
+#import "PGKeyboardLayout.h"
 #import "PGFoundationAdditions.h"
 #import "PGGeometry.h"
 #import "PGDocumentController.h"	//	for thumbnail userDefault keys
@@ -2167,6 +2168,12 @@ NSLog(@"%@", logStr);
 - (void)keyDown:(NSEvent *)anEvent
 {
 	if(anEvent.modifierFlags & NSEventModifierFlagCommand) return [super keyDown:anEvent];
+	//	2026/10/31 added: the same as in the main window (see -clipView:handleKeyDown:)
+	if(!(anEvent.modifierFlags & (NSEventModifierFlagShift | NSEventModifierFlagOption | NSEventModifierFlagControl)) &&
+	   (PGKeyPageUp == anEvent.keyCode || PGKeyPageDown == anEvent.keyCode)) {
+		if(!anEvent.ARepeat) [NSApp sendAction:PGKeyPageUp == anEvent.keyCode ? @selector(firstOfPreviousFolder:) : @selector(firstOfNextFolder:) to:nil from:self];
+		return;
+	}
 	if(![NSApp.mainMenu performKeyEquivalent:anEvent]) [self interpretKeyEvents:@[anEvent]];
 }
 
