@@ -67,7 +67,10 @@ typedef NS_ENUM(NSInteger, PGRecursionPolicy) {
 //	see -[PGArchiveAdapter shouldRecursivelyCreateChildren]) are loaded when
 //	they're searched for pages while the block runs (eg, to show the next page)
 + (void)performLoadingDeferredContainers:(void (^)(void))block;
+//	2026/11/02 added: only the containers for which the test returns YES
++ (void)performLoadingDeferredContainers:(void (^)(void))block passingTest:(BOOL (^)(PGNode *node))test;
 + (BOOL)loadsDeferredContainers;
++ (BOOL)loadsDeferredContainerOfNode:(PGNode *)node;	//	2026/11/02 added
 
 - (instancetype)initWithNode:(PGNode *)node dataProvider:(PGDataProvider *)dataProvider NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;

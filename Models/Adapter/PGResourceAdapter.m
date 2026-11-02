@@ -164,16 +164,28 @@ static PGNode *PGNodeReloadingIgnoringMaxDepth = nil;	//	2026/10/28 added
 	return PGNodeReloadingIgnoringMaxDepth;
 }
 static NSUInteger PGLoadingDeferredContainers = 0;	//	2026/10/28 added
+static BOOL (^PGDeferredContainerTest)(PGNode *) = nil;	//	2026/11/02 added
 + (void)performLoadingDeferredContainers:(void (^)(void))block	//	2026/10/28 added
 {
+	[self performLoadingDeferredContainers:block passingTest:nil];
+}
++ (void)performLoadingDeferredContainers:(void (^)(void))block passingTest:(BOOL (^)(PGNode *node))test	//	2026/11/02 added
+{
 	NSAssert(NSThread.isMainThread, @"");
+	BOOL (^const previousTest)(PGNode *) = PGDeferredContainerTest;
+	PGDeferredContainerTest = test;
 	PGLoadingDeferredContainers++;
 	block();
 	PGLoadingDeferredContainers--;
+	PGDeferredContainerTest = previousTest;
 }
 + (BOOL)loadsDeferredContainers	//	2026/10/28 added
 {
 	return PGLoadingDeferredContainers > 0;
+}
++ (BOOL)loadsDeferredContainerOfNode:(PGNode *)node	//	2026/11/02 added
+{
+	return PGLoadingDeferredContainers > 0 && (!PGDeferredContainerTest || PGDeferredContainerTest(node));
 }
 - (BOOL)shouldRecursivelyCreateChildren
 {

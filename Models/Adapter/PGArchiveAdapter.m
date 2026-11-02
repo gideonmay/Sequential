@@ -205,7 +205,7 @@ PGThumbnailOfFirstImageInArchive(NSString *path, CGFloat maxPixelSize)
 }
 - (BOOL)loadDeferredChildrenIfAllowed
 {
-	if(!_deferred || ![PGResourceAdapter loadsDeferredContainers]) return NO;
+	if(!_deferred || ![PGResourceAdapter loadsDeferredContainerOfNode:self.node]) return NO;	//	2026/11/02 was +loadsDeferredContainers
 	[self _loadDeferredArchive];
 	return YES;
 }
