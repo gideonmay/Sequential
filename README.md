@@ -56,7 +56,8 @@ macOS 27 or later. Changes compared to chuchusoft's 2.6.0:
   colored dots
 - the Delete key above the arrow keys (forward delete) moves the current
   image to the Trash and shows the next one
-- View > Tag Filter: show only images with a Finder tag
+- View > Tag Filter: show only images with a Finder tag (the pages of an
+  archive have its tags); also for First/Last and Page Up/Page Down
 - Edit > Undo for Move to Trash and tag changes
 - View > Two Pages Side by Side (P) for comics
 - View > Transition > Ken Burns Effect in Slideshows

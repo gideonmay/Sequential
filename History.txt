@@ -23,7 +23,9 @@
   archives show their first page.
 - "Open in Sequential" service for folders, PDFs and archives in the Finder.
 - the Open panel is shown at launch when nothing else is opened.
-- View > Tag Filter (Control-Option-1 to 8): show only images with a tag.
+- View > Tag Filter (Control-Option-1 to 8): show only images with a tag;
+  the pages of an archive or PDF have its tags. First, Last and the next and
+  previous folder commands (Page Down, Page Up) skip the other images too.
 - Edit > Undo puts images moved to the Trash back and reverts tag changes.
 - View > Two Pages Side by Side (P): two portrait pages are shown together.
 - View > Transition > Ken Burns Effect in Slideshows.

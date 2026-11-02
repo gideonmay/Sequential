@@ -226,6 +226,7 @@ SetControlAttributedStringValue(NSControl *c, NSAttributedString *anObject) {
 - (void)_moveActiveNodeToTrash;	//	2026/10/28 added
 - (NSURL *)_URLForFinderTags;	//	2026/10/28 added
 - (PGNode *)_nodeForFinderTags;	//	2026/11/02 added
+- (PGNode *)_firstOfFolderMatchingTagFilterFrom:(PGNode *)node next:(BOOL)flag;	//	2026/11/02 added
 - (BOOL)_nodeMatchesTagFilter:(PGNode *)node;	//	2026/10/28 added
 - (void)_performLoadingDeferredArchives:(void (^)(void))block;	//	2026/10/28 added
 - (BOOL)_tryToGoForward:(BOOL)forward allowAlerts:(BOOL)flag;	//	2026/10/28 added
@@ -920,13 +921,15 @@ PGFinderTagImage(NSColor *color)
 - (IBAction)firstPage:(id)sender
 {
 	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
-		[self setActiveNode:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:YES] forward:YES];
+		//	2026/11/02 the first page that matches the tag filter
+		[self setActiveNode:[self _nodeMatchingTagFilterFrom:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:YES] forward:YES] forward:YES];
 	}];
 }
 - (IBAction)lastPage:(id)sender
 {
 	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
-		[self setActiveNode:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO] forward:NO];
+		//	2026/11/02 the last page that matches the tag filter
+		[self setActiveNode:[self _nodeMatchingTagFilterFrom:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO] forward:NO] forward:NO];
 	}];
 }
 
@@ -935,16 +938,18 @@ PGFinderTagImage(NSColor *color)
 - (IBAction)firstOfPreviousFolder:(id)sender
 {
 	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
-		if([self tryToSetActiveNode:[self.activeNode.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:NO] forward:YES]) return;
+		//	2026/11/02 with a tag filter, folders and archives without a matching page are skipped
+		if([self tryToSetActiveNode:[self _firstOfFolderMatchingTagFilterFrom:[self.activeNode.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:NO] next:NO] forward:YES]) return;
 		[self prepareToLoop]; // -firstOfPreviousFolder: is an exception to our usual looping mechanic, so we can't use -loopForward:.
 		PGNode *const last = [self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:NO];
-		[self tryToLoopForward:NO toNode:last.resourceAdapter.isSortedFirstViewableNodeOfFolder ? last : [last.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:YES] pageForward:YES allowAlerts:YES];
+		[self tryToLoopForward:NO toNode:[self _firstOfFolderMatchingTagFilterFrom:last.resourceAdapter.isSortedFirstViewableNodeOfFolder ? last : [last.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:YES] next:NO] pageForward:YES allowAlerts:YES];
 	}];
 }
 - (IBAction)firstOfNextFolder:(id)sender
 {
 	[self _performLoadingDeferredArchives:^{	//	2026/10/28 archives are loaded when needed
-		if([self tryToSetActiveNode:[self.activeNode.resourceAdapter sortedFirstViewableNodeInFolderNext:YES inclusive:NO] forward:YES]) return;
+		//	2026/11/02 with a tag filter, folders and archives without a matching page are skipped
+		if([self tryToSetActiveNode:[self _firstOfFolderMatchingTagFilterFrom:[self.activeNode.resourceAdapter sortedFirstViewableNodeInFolderNext:YES inclusive:NO] next:YES] forward:YES]) return;
 		[self loopForward:YES];
 	}];
 }
@@ -1455,6 +1460,21 @@ PGFinderTagImage(NSColor *color)
 	}
 	return node;
 }
+- (PGNode *)_firstOfFolderMatchingTagFilterFrom:(PGNode *)node next:(BOOL)flag	//	2026/11/02 added
+{
+	//	node is the first page of a folder or archive; with a tag filter, the
+	//	first matching page of it or, when it has none, of the next (or
+	//	previous) folder or archive that has one. Archives without the tag
+	//	aren't loaded (see -_performLoadingDeferredArchives:)
+	if(!self.activeDocument.tagFilter) return node;
+	//	forwards, the next matching page is in the next folder that has one
+	if(flag) return [self _nodeMatchingTagFilterFrom:node forward:YES];
+	for(; node; node = [node.resourceAdapter sortedFirstViewableNodeInFolderNext:NO inclusive:NO]) {
+		PGNode *const match = [self _nodeMatchingTagFilterFrom:node forward:YES];
+		if(match && match.parentNode == node.parentNode) return match;
+	}
+	return nil;
+}
 - (IBAction)changeTagFilter:(id)sender	//	2026/10/28 added
 {
 	//	shows the first matching page (from the current one); with no matching
@@ -1476,7 +1496,7 @@ PGFinderTagImage(NSColor *color)
 - (void)loopForward:(BOOL)flag
 {
 	[self prepareToLoop];
-	[self tryToLoopForward:flag toNode:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:flag] pageForward:flag allowAlerts:YES];
+	[self tryToLoopForward:flag toNode:[self _nodeMatchingTagFilterFrom:[self.activeDocument.node.resourceAdapter sortedViewableNodeFirst:flag] forward:flag] pageForward:flag allowAlerts:YES];	//	2026/11/02 tag filter
 }
 - (void)prepareToLoop
 {
