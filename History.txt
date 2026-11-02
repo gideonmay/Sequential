@@ -15,7 +15,7 @@
   the info bubble, the thumbnails and the Page menu show the tags as colored
   dots.
 - the Delete key above the arrow keys (forward delete) moves the current
-  image to the Trash and shows the next one, also during a slideshow.
+  image to the Trash and shows the next one at once, also during a slideshow.
 - a Loading panel with progress, thumbnails and Stop for slow loads; folders
   of large archives on external volumes open much faster.
 - the thumbnails: clicking a folder or archive shows its first image, a

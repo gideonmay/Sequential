@@ -272,37 +272,58 @@ NSString *const PGDocumentUpdateRecursivelyKey = @"PGDocumentUpdateRecursively";
 }
 - (void)moveNodesToTrash:(NSArray<PGNode *> *)nodes
 {
-	NSMutableArray<PGNode *> *const trashable = [NSMutableArray array];
+	//	2026/11/02 the nodes are removed first so that the next image is shown
+	//	at once; moving the files to the Trash can take a while (eg, on network
+	//	volumes) and is done on a background queue. A file that couldn't be
+	//	moved is shown again by rescanning its folder
+	NSMutableDictionary<NSURL *, PGNode *> *const parents = [NSMutableDictionary dictionary];
 	NSMutableArray<NSURL *> *const URLs = [NSMutableArray array];
+	NSMutableArray<PGNode *> *const trashable = [NSMutableArray array];
 	for(PGNode *const node in nodes) {
 		PGResourceIdentifier *const ident = node.identifier;
-		if(!ident.isFileIdentifier || !ident.URL) continue;
+		NSURL *const URL = ident.isFileIdentifier ? ident.URL : nil;
+		if(!URL) continue;
+		[URLs addObject:URL];
 		[trashable addObject:node];
-		[URLs addObject:ident.URL];
+		if(node.parentNode) parents[URL] = node.parentNode;
 	}
 	if(!URLs.count) return NSBeep();
-	//	the completion handler runs on an arbitrary queue
-	[NSWorkspace.sharedWorkspace recycleURLs:URLs completionHandler:^(NSDictionary<NSURL *, NSURL *> *newURLs, NSError *error) {
+	for(PGNode *const node in trashable) [node removeFromDocument];
+
+	static dispatch_queue_t queue = nil;	//	serial, so that the files are moved in order
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{ queue = dispatch_queue_create("PGDocument.trash", DISPATCH_QUEUE_SERIAL); });
+	dispatch_async(queue, ^{
+		NSFileManager *const fileManager = [NSFileManager new];
+		NSMutableDictionary<NSURL *, NSURL *> *const trashURLs = [NSMutableDictionary dictionary];
+		for(NSURL *const URL in URLs) {
+			NSURL *trashURL = nil;
+			if([fileManager trashItemAtURL:URL resultingItemURL:&trashURL error:NULL] && trashURL) trashURLs[URL] = trashURL;
+		}
 		dispatch_async(dispatch_get_main_queue(), ^{
-			if(error) NSBeep();
-			//	the folder of each file is kept so it can be rescanned when it's put back
-			NSMutableDictionary<NSURL *, NSURL *> *const trashURLs = [NSMutableDictionary dictionary];
-			NSMutableDictionary<NSURL *, PGNode *> *const parents = [NSMutableDictionary dictionary];
-			for(PGNode *const node in trashable) {
-				NSURL *const URL = node.identifier.URL;
-				NSURL *const trashURL = URL ? newURLs[URL] : nil;
-				if(!trashURL) continue;
-				trashURLs[URL] = trashURL;
-				if(node.parentNode) parents[URL] = node.parentNode;
-				[node removeFromDocument];
+			if(trashURLs.count < URLs.count) {
+				//	the folder is rescanned and the first such image is shown again
+				NSBeep();
+				PGNode *failed = nil;
+				for(NSURL *const URL in URLs) {
+					PGNode *const parent = parents[URL];
+					if(trashURLs[URL] || !parent) continue;
+					[parent noteFileEventDidOccurDirect:YES];
+					PGResourceAdapter *const adapter = parent.resourceAdapter;
+					if(!failed && adapter.isContainer) failed = [(PGContainerAdapter *)adapter childForIdentifier:URL.PG_resourceIdentifier];
+				}
+				if(failed) [self.displayController activateNode:failed];
 			}
 			if(!trashURLs.count) return;
+			//	the folder of each file is kept so it can be rescanned when it's put back
+			NSMutableDictionary<NSURL *, PGNode *> *const trashedParents = [NSMutableDictionary dictionary];
+			for(NSURL *const URL in trashURLs) if(parents[URL]) trashedParents[URL] = parents[URL];
 			[self.undoManager registerUndoWithTarget:self handler:^(PGDocument *document) {
-				[document _putBackTrashedFiles:trashURLs parents:parents];
+				[document _putBackTrashedFiles:trashURLs parents:trashedParents];
 			}];
 			[self.undoManager setActionName:NSLocalizedString(@"Move to Trash", @"Undo action name.")];
 		});
-	}];
+	});
 }
 - (void)_putBackTrashedFiles:(NSDictionary<NSURL *, NSURL *> *)trashURLs parents:(NSDictionary<NSURL *, PGNode *> *)parents
 {

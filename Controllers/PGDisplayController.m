@@ -1812,6 +1812,20 @@ PGFinderTagImage(NSColor *color)
 	NSArray *const removedChildren = aNotif.userInfo[PGDocumentRemovedChildrenKey];
 	PGNode *node = [self.activeNode.resourceAdapter sortedViewableNodeNext:YES afterRemovalOfChildren:removedChildren fromNode:changedNode];
 	if(!node) node = [self.activeNode.resourceAdapter sortedViewableNodeNext:NO afterRemovalOfChildren:removedChildren fromNode:changedNode];
+	//	2026/11/02 with a tag filter, the next (or previous) page that matches it
+	//	(not one that's being removed); else the next page as without the filter
+	if(node && self.activeDocument.tagFilter && ![self _nodeMatchesTagFilter:node]) {
+		BOOL (^const isRemoved)(PGNode *) = ^BOOL(PGNode *n) {
+			return [removedChildren containsObject:[n ancestorThatIsChildOfNode:changedNode]];
+		};
+		PGNode *match = nil;
+		for(int i = 0; i < 2 && !match; i++) {
+			BOOL const forward = 0 == i;
+			match = [self _nodeMatchingTagFilterFrom:node forward:forward];
+			while(match && isRemoved(match)) match = [self _nodeMatchingTagFilterFrom:[match.resourceAdapter sortedViewableNodeNext:forward] forward:forward];
+		}
+		if(match) node = match;
+	}
 	[self setActiveNode:node forward:YES];
 }
 - (void)documentSortedNodesDidChange:(NSNotification *)aNotif
