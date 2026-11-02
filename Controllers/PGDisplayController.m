@@ -2880,7 +2880,7 @@ PGFinderTagImage(NSColor *color)
 	//	that tags changed elsewhere (eg, in the Finder) are shown when the image is
 	//	(2026/11/02 or those of its archive)
 	PGNode *const tagNode = [self _nodeForFinderTags];
-	[tagNode.identifier noteFinderTagsDidChange];
+	[tagNode noteFinderTagsDidChange];	//	2026/11/02 also updates its Page menu item
 	if(tagNode) [self.activeDocument noteNodeThumbnailDidChange:tagNode recursively:NO];
 	((PGInfoView *)_infoPanel.contentView).tagColors = tagNode.identifier.tagColors;
 }

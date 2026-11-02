@@ -82,6 +82,7 @@ enum {
 @property (nonatomic, assign) BOOL viewable;
 @property (nonatomic, strong) NSMenuItem *menuItem;
 @property (nonatomic, assign) BOOL allowMenuItemUpdates;
+@property (nonatomic, assign) BOOL menuItemShowsTags;	//	2026/11/02 added: set when its menu opens
 
 - (instancetype)init NS_UNAVAILABLE;
 
@@ -89,6 +90,7 @@ enum {
 
 - (void)_updateMenuItem;
 - (void)_updateFileAttributes;
+- (void)_noteMenuItemWillBeShown;	//	2026/11/02 added
 
 @end
 
@@ -105,6 +107,28 @@ enum {
 @end
 
 #endif
+
+//	2026/11/02 added
+@interface PGNodeMenuDelegateObject : NSObject <NSMenuDelegate>
+@end
+@implementation PGNodeMenuDelegateObject
+- (void)menuWillOpen:(NSMenu *)menu
+{
+	//	not -menuNeedsUpdate:, which is also called to look for key equivalents
+	for(NSMenuItem *const item in menu.itemArray) {
+		id const value = item.representedObject;
+		if(![value isKindOfClass:[NSValue class]] || @selector(jumpToPage:) != item.action) continue;
+		[(PGNode *)[value nonretainedObjectValue] _noteMenuItemWillBeShown];
+	}
+}
+@end
+id<NSMenuDelegate>
+PGNodeMenuDelegate(void)
+{
+	static PGNodeMenuDelegateObject *delegate = nil;
+	if(!delegate) delegate = [PGNodeMenuDelegateObject new];
+	return delegate;
+}
 
 @implementation PGNode
 
@@ -494,7 +518,23 @@ enum {
 #else
 		[label appendAttributedString:[[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@" (%@)", info] attributes:[NSDictionary dictionaryWithObjectsAndKeys:[NSColor grayColor], NSForegroundColorAttributeName, [NSFont boldSystemFontOfSize:12], NSFontAttributeName, nil]] autorelease]];
 #endif
+	//	2026/11/02 a dot in each Finder tag's color after the name
+	NSArray<NSColor *> *const tagColors = _menuItemShowsTags ? self.identifier.tagColors : nil;
+	if(tagColors.count) [label appendAttributedString:[[NSAttributedString alloc] initWithString:@" "]];
+	for(NSColor *const color in tagColors)
+		[label appendAttributedString:[[NSAttributedString alloc] initWithString:@"\u25CF" attributes:@{NSForegroundColorAttributeName: color}]];
 	_menuItem.attributedTitle = label;
+}
+- (void)_noteMenuItemWillBeShown	//	2026/11/02 added
+{
+	if(_menuItemShowsTags) return;
+	_menuItemShowsTags = YES;
+	if(self.identifier.tagLabels.count) [self _updateMenuItem];
+}
+- (void)noteFinderTagsDidChange	//	2026/11/02 added
+{
+	[self.identifier noteFinderTagsDidChange];
+	if(_menuItemShowsTags) [self _updateMenuItem];
 }
 - (void)_updateFileAttributes
 {

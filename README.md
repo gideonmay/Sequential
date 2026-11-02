@@ -51,8 +51,9 @@ macOS 27 or later. Changes compared to chuchusoft's 2.6.0:
 - folders can be chosen in the File > Open panel again
 - File > Tags: Control-1 to Control-7 add or remove a Finder tag (Red,
   Orange, Yellow, Green, Blue, Purple, Gray) of the current image (of
-  the archive when the image is in one), Control-0 removes all its tags; the info bubble and the thumbnails show
-  the tags as colored dots
+  the archive when the image is in one), Control-0 removes all its tags;
+  the info bubble, the thumbnails and the Page menu show the tags as
+  colored dots
 - the Delete key above the arrow keys (forward delete) moves the current
   image to the Trash and shows the next one
 - View > Tag Filter: show only images with a Finder tag

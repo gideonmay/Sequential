@@ -43,6 +43,11 @@ extern NSString *const PGImageRepKey;
 
 extern NSString *const PGNodeErrorDomain;
 
+//	2026/11/02 added: the delegate of the Page menu and its submenus; the
+//	items show the Finder tags of their files once the menu has been opened
+//	(reading them for every file when it's loaded would be slow on network volumes)
+extern id<NSMenuDelegate> PGNodeMenuDelegate(void);
+
 typedef NS_ENUM(NSUInteger, PGNodeStatus) {
 	PGGenericError  = 1,
 	PGPasswordError = 2,
@@ -98,6 +103,7 @@ typedef NS_ENUM(NSUInteger, PGNodeStatus) {
 - (NSComparisonResult)compare:(PGNode *)node; // Uses the document's sort mode.
 - (BOOL)writeToPasteboard:(NSPasteboard *)pboard types:(NSArray *)types;
 - (void)addToMenu:(NSMenu *)menu flatten:(BOOL)flatten;
+- (void)noteFinderTagsDidChange;	//	2026/11/02 added: rereads the tags and updates the menu item
 
 - (PGNode *)ancestorThatIsChildOfNode:(PGNode *)aNode;
 - (BOOL)isDescendantOfNode:(PGNode *)aNode;

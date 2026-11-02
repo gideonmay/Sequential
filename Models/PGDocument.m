@@ -342,7 +342,7 @@ NSString *const PGDocumentUpdateRecursivelyKey = @"PGDocumentUpdateRecursively";
 		if(![document setFinderTags:previousTags ofNode:node actionName:actionName]) NSBeep();
 	}];
 	[self.undoManager setActionName:actionName];
-	[node.identifier noteFinderTagsDidChange];
+	[node noteFinderTagsDidChange];	//	2026/11/02 was [node.identifier noteFinderTagsDidChange]
 	[self noteNodeThumbnailDidChange:node recursively:NO];
 	[self.displayController noteFinderTagsDidChangeForNode:node];
 	return YES;
@@ -550,6 +550,7 @@ NSString *const PGDocumentUpdateRecursivelyKey = @"PGDocumentUpdateRecursively";
 	if((self = [super init])) {
 		_pageMenu = [[PGDocumentController sharedDocumentController].defaultPageMenu copy];
 		[_pageMenu addItem:[NSMenuItem separatorItem]];
+		_pageMenu.delegate = PGNodeMenuDelegate();	//	2026/11/02 added: Finder tags
 		_cachedNodes = [NSMutableArray new];
 		_operationQueue = [[NSOperationQueue alloc] init];
 		_operationQueue.maxConcurrentOperationCount = 2; // Our operations (thumbnail generation) are usually IO-bound, so too much concurrency is detrimental to performance.

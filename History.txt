@@ -11,8 +11,9 @@
 - View > Background: Ambient (a blurred copy of the image fills the area
   around it), Black or the Settings color.
 - File > Tags: Control-1 to Control-7 add or remove a Finder tag of the
-  current image (or of its archive or PDF), Control-0 removes all its tags; the info bubble and the
-  thumbnails show the tags as colored dots.
+  current image (or of its archive or PDF), Control-0 removes all its tags;
+  the info bubble, the thumbnails and the Page menu show the tags as colored
+  dots.
 - the Delete key above the arrow keys (forward delete) moves the current
   image to the Trash and shows the next one, also during a slideshow.
 - a Loading panel with progress, thumbnails and Stop for slow loads; folders

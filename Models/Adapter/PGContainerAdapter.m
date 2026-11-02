@@ -237,6 +237,7 @@ NSString *const PGMaxDepthKey = @"PGMaxDepth";
 	_sortedChildren = nil;
 #if __has_feature(objc_arc)
 	self.node.menuItem.submenu = _unsortedChildren.count ? [NSMenu new] : nil;
+	self.node.menuItem.submenu.delegate = PGNodeMenuDelegate();	//	2026/11/02 added
 #else
 	[[[self node] menuItem] setSubmenu:_unsortedChildren.count ? [[[NSMenu alloc] init] autorelease] : nil];
 #endif
